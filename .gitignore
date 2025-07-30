@@ -10,6 +10,11 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+build/
+*.apk
+*.so
+*.dill
+
 
 # IntelliJ related
 *.iml
