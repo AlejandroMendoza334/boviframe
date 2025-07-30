@@ -4,7 +4,9 @@ import 'package:flutter/services.dart'; // Para rootBundle.load()
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:flutter/rendering.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -432,6 +434,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
     sessionProv.setImage(_imageBytes);
 
     final data = <String, dynamic>{
+      'usuarioId': FirebaseAuth.instance.currentUser!.uid,
       'numero': _numeroController.text,
       'registro': _registroController.text,
       'sexo': _selectedSexo,
@@ -738,6 +741,8 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
   /// Carga todas las evaluaciones dentro de cada sesión (colección raíz)
   Future<List<Map<String, dynamic>>> _cargarTodasLasEvaluaciones() async {
     final firestore = FirebaseFirestore.instance;
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return [];
 
     final sesionesSnapshot =
         await firestore
@@ -750,12 +755,13 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
     for (final sesionDoc in sesionesSnapshot.docs) {
       final sessionId = sesionDoc.id;
 
-      // Leer todas las evaluaciones de esta sesión
+      // 🔐 Leer solo evaluaciones de este usuario
       final evalsSnapshot =
           await firestore
               .collection('sesiones')
               .doc(sessionId)
               .collection('evaluaciones_animales')
+              .where('usuarioId', isEqualTo: userId)
               .orderBy('timestamp', descending: true)
               .get();
 
@@ -772,6 +778,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
 
   /// -----------------------------------------------------------------------
   /// DIALOG PARA “Ver sesiones y evaluaciones”
+  ///
   void _mostrarConteosDialog() {
     showDialog(
       context: context,
@@ -908,7 +915,30 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
                                         subtitle: Text(
                                           'Nac.: $fechaNac  ·  Peso: $pesoNac',
                                         ),
-                                        onTap: () {
+                                        onTap: () async {
+                                          final currentUserId =
+                                              FirebaseAuth
+                                                  .instance
+                                                  .currentUser
+                                                  ?.uid;
+                                          final evalUserId =
+                                              m['usuarioId'] as String?;
+
+                                          if (currentUserId == null ||
+                                              evalUserId != currentUserId) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  '⛔ No puedes acceder a esta evaluación.',
+                                                ),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                            return;
+                                          }
+
                                           Navigator.of(context).pop();
                                           Navigator.push(
                                             context,
@@ -1283,6 +1313,56 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
     }
   }
 
+  void _mostrarOpcionesImagen() {
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (ctx) => Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.visibility),
+                title: const Text('Ver imagen actual'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showDialog(
+                    context: context,
+                    builder:
+                        (_) => AlertDialog(
+                          content: Image.memory(_imageBytes!),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cerrar'),
+                            ),
+                          ],
+                        ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Reemplazar imagen'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Quitar imagen'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _imageBytes = null;
+                    _hasChanged = true;
+                  });
+                },
+              ),
+            ],
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Si aún estoy cargando datos de Firestore:
@@ -1442,9 +1522,16 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
               const Text('Foto del animal:'),
               const SizedBox(height: 8),
               GestureDetector(
-                onTap: _pickImage,
+                onTap: () {
+                  if (_imageBytes != null) {
+                    _mostrarOpcionesImagen();
+                  } else {
+                    _pickImage();
+                  }
+                },
                 child: Container(
                   height: 180,
+
                   width: double.infinity,
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black54),

@@ -11,6 +11,8 @@ import '../screens/login_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/forgot_password_screen.dart';
 import '../screens/main_menu.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../screens/settings_screen.dart';
 import '../screens/epmuras/datos_productor.dart';
 import '../screens/epmuras/epmuras_screen.dart';
@@ -41,12 +43,20 @@ import '../screens/new_admin_screen.dart';
 import '../screens/new_edit_screen.dart';
 import '../screens/bases_teoricas.dart';
 import '../screens/sesiones_screen.dart';
+import '../screens/new_admin_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print('Mensaje recibido en segundo plano: ${message.notification?.title}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   await Hive.initFlutter();
   Hive.registerAdapter(EvaluacionAnimalAdapter());
@@ -71,6 +81,21 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final notification = message.notification;
+      if (notification != null) {
+        final snackBar = SnackBar(
+          content: Text('${notification.title}: ${notification.body}'),
+          duration: const Duration(seconds: 3),
+        );
+
+        final context = navigatorKey.currentContext;
+        if (context != null) {
+          ScaffoldMessenger.of(context).showSnackBar(snackBar);
+        }
+      }
+    });
+
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(

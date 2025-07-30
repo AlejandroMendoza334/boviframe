@@ -34,7 +34,10 @@ class _ExternalWebViewScreenState extends State<ExternalWebViewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Contenido completo'), titleTextStyle: const TextStyle(
+        iconTheme: const IconThemeData(color: Colors.white),
+
+        title: const Text('Contenido completo'),
+        titleTextStyle: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
           color: Colors.white,

@@ -19,14 +19,24 @@ class _NewsPublicScreenState extends State<NewsPublicScreen> {
   bool get _isAdmin {
     final user = _auth.currentUser;
     if (user == null) return false;
-    return user.uid == 'p9HOIe0bhuXKCXtLonmO2DXIQyf2';
+
+    const allowedUserIds = [
+      'p9HOIe0bhuXKCXtLonmO2DXIQyf2',
+      'M7KKEeEg3jMgtWmm2soRswNMrWg2',
+      'mVwfoVqwbTOnAt1XVhXqrzjKuwI2',
+    ];
+
+    return allowedUserIds.contains(user.uid);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Noticias'), titleTextStyle: const TextStyle(
+        iconTheme: const IconThemeData(color: Colors.white),
+
+        title: const Text('📰  ULTIMAS NOTICIAS  📰'),
+        titleTextStyle: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
           color: Colors.white,
@@ -39,7 +49,10 @@ class _NewsPublicScreenState extends State<NewsPublicScreen> {
           // ESTE BLOQUE SOLO SE VE SI _isAdmin == true
           if (_isAdmin) ...[
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(
+                vertical: 8.0,
+                horizontal: 16.0,
+              ),
               child: Row(
                 children: [
                   Expanded(
@@ -74,10 +87,11 @@ class _NewsPublicScreenState extends State<NewsPublicScreen> {
           // El listado (visible para todos, admin o no)
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('news')
-                  .orderBy('timestamp', descending: true)
-                  .snapshots(),
+              stream:
+                  _firestore
+                      .collection('news')
+                      .orderBy('timestamp', descending: true)
+                      .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -90,39 +104,130 @@ class _NewsPublicScreenState extends State<NewsPublicScreen> {
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
                     final data = docs[index].data() as Map<String, dynamic>;
-                    final title = data['title'] as String? ?? '';
-                    final ts = data['timestamp'] as Timestamp?;
-                    final date = ts?.toDate();
-                    final formattedDate = (date != null)
-                        ? '${date.day.toString().padLeft(2, '0')}/'
-                          '${date.month.toString().padLeft(2, '0')}/'
-                          '${date.year}'
-                        : '';
+                    final title = data['title'] ?? 'Sin título';
+                    final category = data['category'] ?? 'General';
+                    final timestamp = data['timestamp'] as Timestamp?;
+                    final formattedDate =
+                        timestamp != null
+                            ? '${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}'
+                            : 'Fecha no disponible';
+                    final newsCategory = data['category'] as String? ?? 'Otro';
+                    final categoryColors = {
+                      'Educación': Colors.deepPurple.shade100,
+                      'Ciencia': Colors.teal.shade100,
+                      'Manejo': Colors.blue.shade100,
+                      'Reproducción': Colors.orange.shade100,
+                      'Genética': Colors.green.shade100,
+                      'Sanidad': Colors.red.shade100,
+                      'Agricultura': Colors.brown.shade100,
+                      'Otras noticias': Colors.grey.shade300,
+                      'General': Colors.indigo.shade100,
+                      'Evento': Colors.pink.shade100,
+                      'Anuncio': Colors.amber.shade100,
+                      'Otro': Colors.grey.shade200,
+                    };
 
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 2,
-                      child: ListTile(
-                        leading: Image.asset(
-                          'assets/icons/logo1.png',
-                          width: 28,
-                          height: 28,
+                    final categoryColor =
+                        categoryColors[newsCategory] ?? Colors.grey.shade200;
+
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.of(
+                          context,
+                        ).pushNamed('/news_detail', arguments: docs[index].id);
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 4,
                         ),
-                        title: Text(
-                          title,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade200),
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        subtitle: Text(formattedDate),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: () {
-                          Navigator.of(context).pushNamed(
-                            '/news_detail',
-                            arguments: docs[index].id,
-                          );
-                        },
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Logo
+                            Padding(
+                              padding: const EdgeInsets.only(right: 14),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.asset(
+                                  'assets/icons/logo1.png',
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+
+                            // Contenido
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Categoría con fondo
+                                  const SizedBox(height: 8),
+
+                                  // Título
+                                  Text(
+                                    title,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+
+                                  // Fecha y categoría juntos (debajo del título)
+                                  Row(
+                                    children: [
+                                      Text(
+                                        formattedDate,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: categoryColor,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          category,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

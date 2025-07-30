@@ -4,7 +4,8 @@ class EpmurasInfographicWidget extends StatefulWidget {
   const EpmurasInfographicWidget({Key? key}) : super(key: key);
 
   @override
-  State<EpmurasInfographicWidget> createState() => _EpmurasInfographicWidgetState();
+  State<EpmurasInfographicWidget> createState() =>
+      _EpmurasInfographicWidgetState();
 }
 
 class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
@@ -21,6 +22,8 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
       appBar: AppBar(
         backgroundColor: Colors.blue[800],
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+
         title: const Text(
           'Bases Teóricas',
           style: TextStyle(
@@ -55,7 +58,10 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
             Container(
               width: double.infinity,
               color: const Color(0xFF005082),
-              padding: const EdgeInsets.symmetric(vertical: 48.0, horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(
+                vertical: 48.0,
+                horizontal: 16.0,
+              ),
               child: Column(
                 children: [
                   Text(
@@ -64,7 +70,8 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       color: Colors.white,
-                      fontSize: MediaQuery.of(context).size.width > 768 ? 48.0 : 36.0,
+                      fontSize:
+                          MediaQuery.of(context).size.width > 768 ? 48.0 : 36.0,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -75,7 +82,8 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       color: Colors.white,
-                      fontSize: MediaQuery.of(context).size.width > 768 ? 20.0 : 18.0,
+                      fontSize:
+                          MediaQuery.of(context).size.width > 768 ? 20.0 : 18.0,
                       fontWeight: FontWeight.w300,
                     ),
                   ),
@@ -96,7 +104,10 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             color: const Color(0xFF005082),
-                            fontSize: MediaQuery.of(context).size.width > 768 ? 32.0 : 28.0,
+                            fontSize:
+                                MediaQuery.of(context).size.width > 768
+                                    ? 32.0
+                                    : 28.0,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -179,7 +190,10 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                           ),
                         ],
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 48.0, horizontal: 16.0),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 48.0,
+                        horizontal: 16.0,
+                      ),
                       child: Column(
                         children: [
                           Text(
@@ -188,11 +202,13 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                             style: TextStyle(
                               fontFamily: 'Roboto',
                               color: const Color(0xFF005082),
-                              fontSize: MediaQuery.of(context).size.width > 768 ? 32.0 : 28.0,
+                              fontSize:
+                                  MediaQuery.of(context).size.width > 768
+                                      ? 32.0
+                                      : 28.0,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 16.0),
                           const Text(
                             'Un proceso sistemático en 5 pasos para transformar datos en decisiones rentables.',
                             textAlign: TextAlign.center,
@@ -201,7 +217,6 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                               fontSize: 16.0,
                             ),
                           ),
-                          const SizedBox(height: 32.0),
                           _buildFlowchartStep(
                             '1',
                             'Identificación Individual',
@@ -236,87 +251,7 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.only(top: 48.0, bottom: 40.0),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Beneficios Clave: Antes y Después',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            color: const Color(0xFF005082),
-                            fontSize: MediaQuery.of(context).size.width > 768 ? 32.0 : 28.0,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 16.0),
-                        const Text(
-                          'La implementación de EPMURAS marca una diferencia medible en la eficiencia y rentabilidad del hato. La gráfica compara los resultados de un manejo tradicional frente a uno basado en EPMURAS.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 16.0,
-                          ),
-                        ),
-                        const SizedBox(height: 32.0),
-                        Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 10.0,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            children: [
-                              const Text(
-                                'Gráfico de Barras: Comparativa de Beneficios',
-                                style: TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 18.0,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0077C0),
-                                ),
-                              ),
-                              const SizedBox(height: 16.0),
-                              const Text(
-                                'Los datos presentados a continuación se visualizan en un gráfico de barras. En una aplicación real de FlutterFlow, aquí se integraría un widget de gráfico (por ejemplo, de la librería fl_chart o charts_flutter) para una representación interactiva.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontFamily: 'Roboto', fontSize: 14.0),
-                              ),
-                              const SizedBox(height: 16.0),
-                              Container(
-                                height: 300,
-                                color: Colors.grey[200],
-                                alignment: Alignment.center,
-                                child: const Text(
-                                  'Placeholder para Gráfico de Barras\n(Usa fl_chart o similar en FlutterFlow)',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.grey, fontSize: 16.0),
-                                ),
-                              ),
-                              const SizedBox(height: 16.0),
-                              Column(
-                                children: [
-                                  _buildBarDataRow('Precisión de Selección', 40, 90),
-                                  _buildBarDataRow('Eficiencia Productiva', 60, 85),
-                                  _buildBarDataRow('Retorno de Inversión', 50, 80),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 48.0, bottom: 40.0),
+                    padding: const EdgeInsets.only(bottom: 40.0),
                     child: Column(
                       children: [
                         Text(
@@ -325,7 +260,10 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             color: const Color(0xFF005082),
-                            fontSize: MediaQuery.of(context).size.width > 768 ? 32.0 : 28.0,
+                            fontSize:
+                                MediaQuery.of(context).size.width > 768
+                                    ? 32.0
+                                    : 28.0,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -351,9 +289,21 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                                       'Se priorizan los factores más influyentes en la rentabilidad de la producción de carne para seleccionar al reproductor ideal. El objetivo es maximizar la ganancia de peso y la fertilidad.',
                                       'doughnut',
                                       [
-                                        {'label': 'Ganancia de Peso', 'value': 40, 'color': const Color(0xFF005082)},
-                                        {'label': 'Circunferencia Escrotal', 'value': 30, 'color': const Color(0xFF0077C0)},
-                                        {'label': 'Conformación', 'value': 30, 'color': const Color(0xFF00A1E4)},
+                                        {
+                                          'label': 'Ganancia de Peso',
+                                          'value': 40,
+                                          'color': const Color(0xFF005082),
+                                        },
+                                        {
+                                          'label': 'Circunferencia Escrotal',
+                                          'value': 30,
+                                          'color': const Color(0xFF0077C0),
+                                        },
+                                        {
+                                          'label': 'Conformación',
+                                          'value': 30,
+                                          'color': const Color(0xFF00A1E4),
+                                        },
                                       ],
                                     ),
                                   ),
@@ -365,13 +315,36 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                                       [
                                         {
                                           'label': 'Vaca Promedio',
-                                          'data': [450, 550, 600, 580, 550, 500, 450, 400, 350, 300],
-                                          'color': const Color(0xFF00A1E4)
+                                          'data': [
+                                            450,
+                                            550,
+                                            600,
+                                            580,
+                                            550,
+                                            500,
+                                            450,
+                                            400,
+                                            350,
+                                            300,
+                                          ],
+                                          'color': const Color(0xFF00A1E4),
                                         },
                                         {
-                                          'label': 'Vaca Seleccionada con EPMURAS',
-                                          'data': [550, 680, 750, 720, 680, 620, 550, 500, 450, 400],
-                                          'color': const Color(0xFF005082)
+                                          'label':
+                                              'Vaca Seleccionada con EPMURAS',
+                                          'data': [
+                                            550,
+                                            680,
+                                            750,
+                                            720,
+                                            680,
+                                            620,
+                                            550,
+                                            500,
+                                            450,
+                                            400,
+                                          ],
+                                          'color': const Color(0xFF005082),
                                         },
                                       ],
                                       xAxisLabels: [
@@ -384,7 +357,7 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                                         'Mes 7',
                                         'Mes 8',
                                         'Mes 9',
-                                        'Mes 10'
+                                        'Mes 10',
                                       ],
                                     ),
                                   ),
@@ -398,38 +371,21 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                                     'Se priorizan los factores más influyentes en la rentabilidad de la producción de carne para seleccionar al reproductor ideal. El objetivo es maximizar la ganancia de peso y la fertilidad.',
                                     'doughnut',
                                     [
-                                      {'label': 'Ganancia de Peso', 'value': 40, 'color': const Color(0xFF005082)},
-                                      {'label': 'Circunferencia Escrotal', 'value': 30, 'color': const Color(0xFF0077C0)},
-                                      {'label': 'Conformación', 'value': 30, 'color': const Color(0xFF00A1E4)},
-                                    ],
-                                  ),
-                                  _buildCaseStudyCard(
-                                    'Caso 2: Producción Lechera',
-                                    'Comparativa de la curva de lactancia entre una vaca promedio y una vaca superior, seleccionada mediante EPMURAS por su alta producción y persistencia.',
-                                    'line',
-                                    [
                                       {
-                                        'label': 'Vaca Promedio',
-                                        'data': [450, 550, 600, 580, 550, 500, 450, 400, 350, 300],
-                                        'color': const Color(0xFF00A1E4)
+                                        'label': 'Ganancia de Peso',
+                                        'value': 40,
+                                        'color': const Color(0xFF005082),
                                       },
                                       {
-                                        'label': 'Vaca Seleccionada con EPMURAS',
-                                        'data': [550, 680, 750, 720, 680, 620, 550, 500, 450, 400],
-                                        'color': const Color(0xFF005082)
+                                        'label': 'Circunferencia Escrotal',
+                                        'value': 30,
+                                        'color': const Color(0xFF0077C0),
                                       },
-                                    ],
-                                    xAxisLabels: [
-                                      'Mes 1',
-                                      'Mes 2',
-                                      'Mes 3',
-                                      'Mes 4',
-                                      'Mes 5',
-                                      'Mes 6',
-                                      'Mes 7',
-                                      'Mes 8',
-                                      'Mes 9',
-                                      'Mes 10'
+                                      {
+                                        'label': 'Conformación',
+                                        'value': 30,
+                                        'color': const Color(0xFF00A1E4),
+                                      },
                                     ],
                                   ),
                                 ],
@@ -453,7 +409,10 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 48.0, horizontal: 32.0),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 48.0,
+                      horizontal: 32.0,
+                    ),
                     child: Column(
                       children: [
                         Text(
@@ -462,7 +421,10 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             color: Colors.white,
-                            fontSize: MediaQuery.of(context).size.width > 768 ? 32.0 : 28.0,
+                            fontSize:
+                                MediaQuery.of(context).size.width > 768
+                                    ? 32.0
+                                    : 28.0,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -481,7 +443,8 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                           builder: (context, constraints) {
                             if (constraints.maxWidth > 992) {
                               return Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
                                 children: [
                                   Expanded(
                                     child: _buildFeatureCard(
@@ -600,10 +563,7 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
         children: [
           Text(
             icon,
-            style: const TextStyle(
-              fontSize: 48.0,
-              color: Color(0xFF00A1E4),
-            ),
+            style: const TextStyle(fontSize: 48.0, color: Color(0xFF00A1E4)),
           ),
           const SizedBox(height: 16.0),
           Text(
@@ -620,10 +580,7 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
           Text(
             description,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 14.0,
-            ),
+            style: const TextStyle(fontFamily: 'Roboto', fontSize: 14.0),
           ),
         ],
       ),
@@ -726,7 +683,11 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
             children: [
               Text(
                 'Tradicional ($traditional%)',
-                style: const TextStyle(fontFamily: 'Roboto', fontSize: 13.0, color: Color(0xFF00A1E4)),
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 13.0,
+                  color: Color(0xFF00A1E4),
+                ),
               ),
               Expanded(
                 child: Padding(
@@ -734,7 +695,9 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                   child: LinearProgressIndicator(
                     value: traditional / 100,
                     backgroundColor: const Color(0xFFE0E0E0),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00A1E4)),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFF00A1E4),
+                    ),
                     minHeight: 10.0,
                   ),
                 ),
@@ -746,7 +709,11 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
             children: [
               Text(
                 'EPMURAS ($epmuras%)',
-                style: const TextStyle(fontFamily: 'Roboto', fontSize: 13.0, color: Color(0xFF005082)),
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 13.0,
+                  color: Color(0xFF005082),
+                ),
               ),
               Expanded(
                 child: Padding(
@@ -754,7 +721,9 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                   child: LinearProgressIndicator(
                     value: epmuras / 100,
                     backgroundColor: const Color(0xFFE0E0E0),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF005082)),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFF005082),
+                    ),
                     minHeight: 10.0,
                   ),
                 ),
@@ -803,10 +772,7 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
           Text(
             description,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 14.0,
-            ),
+            style: const TextStyle(fontFamily: 'Roboto', fontSize: 14.0),
           ),
           const SizedBox(height: 16.0),
           Container(
@@ -822,36 +788,44 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
           const SizedBox(height: 16.0),
           if (chartType == 'doughnut')
             Column(
-              children: chartData.map((data) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: data['color'],
-                          shape: BoxShape.circle,
-                        ),
+              children:
+                  chartData.map((data) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: data['color'],
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8.0),
+                          Text(
+                            '${data['label']}: ${data['value']}%',
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14.0,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8.0),
-                      Text(
-                        '${data['label']}: ${data['value']}%',
-                        style: const TextStyle(fontFamily: 'Roboto', fontSize: 14.0),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+                    );
+                  }).toList(),
             ),
           if (chartType == 'line' && xAxisLabels != null)
             Column(
               children: [
                 const Text(
                   'Datos de Producción (Litros/Mes):',
-                  style: TextStyle(fontFamily: 'Roboto', fontSize: 14.0, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 14.0,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8.0),
                 ...chartData.map((data) {
@@ -874,7 +848,10 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                             '${data['label']}: ${data['data'].join(', ')}',
                             overflow: TextOverflow.ellipsis,
                             maxLines: 2,
-                            style: const TextStyle(fontFamily: 'Roboto', fontSize: 13.0),
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 13.0,
+                            ),
                           ),
                         ),
                       ],
@@ -884,7 +861,11 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
                 const SizedBox(height: 8.0),
                 Text(
                   'Meses: ${xAxisLabels.join(', ')}',
-                  style: const TextStyle(fontFamily: 'Roboto', fontSize: 13.0, fontStyle: FontStyle.italic),
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 13.0,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
               ],
             ),
@@ -905,10 +886,7 @@ class _EpmurasInfographicWidgetState extends State<EpmurasInfographicWidget> {
         children: [
           Text(
             icon,
-            style: const TextStyle(
-              fontSize: 48.0,
-              color: Colors.white,
-            ),
+            style: const TextStyle(fontSize: 48.0, color: Colors.white),
           ),
           const SizedBox(height: 16.0),
           Text(

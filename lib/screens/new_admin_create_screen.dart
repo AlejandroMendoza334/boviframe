@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class NewsAdminCreateScreen extends StatefulWidget {
   const NewsAdminCreateScreen({Key? key}) : super(key: key);
@@ -18,6 +20,17 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
   bool _isSaving = false;
   String? _errorMessage;
 
+  final Map<String, Color> categoryColors = {
+    'Educación': Colors.deepPurple.shade100,
+    'Ciencia': Colors.teal.shade100,
+    'Manejo': Colors.blue.shade100,
+    'Reproducción': Colors.orange.shade100,
+    'Genética': Colors.green.shade100,
+    'Sanidad': Colors.red.shade100,
+    'Agricultura': Colors.brown.shade100,
+    'Otras noticias': Colors.grey.shade300,
+  };
+
   final List<String> _categories = [
     'Educación',
     'Ciencia',
@@ -26,7 +39,7 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
     'Genética',
     'Sanidad',
     'Agricultura',
-    'Otras noticias'
+    'Otras noticias',
   ];
   String _selectedCategory = 'Educación';
 
@@ -43,11 +56,37 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
     }
   }
 
+  Future<void> sendLocalNotification(String title) async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://localhost:3000/send-news-notification'),
+        headers: {'Content-Type': 'application/json'},
+        body: '{"title": "$title"}',
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Notificación enviada');
+      } else {
+        print('❌ Error al enviar notificación: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Excepción al enviar notificación: $e');
+    }
+  }
+
+  final List<String> allowedUserIds = [
+    'p9HOIe0bhuXKCXtLonmO2DXIQyf2',
+    'M7KKEeEg3jMgtWmm2soRswNMrWg2',
+    'mVwfoVqwbTOnAt1XVhXqrzjKuwI2',
+  ];
+
   Future<void> _submitForm() async {
     final titleText = _titleController.text.trim();
-    final externalUrl = _urlController.text.trim().isNotEmpty 
-        ? _validateUrl(_urlController.text.trim())
-        : null;
+    await sendLocalNotification(titleText);
+    final externalUrl =
+        _urlController.text.trim().isNotEmpty
+            ? _validateUrl(_urlController.text.trim())
+            : null;
     final contentText = _contentController.text.trim();
 
     if (titleText.isEmpty && externalUrl == null) {
@@ -59,7 +98,7 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
     }
 
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.uid != 'p9HOIe0bhuXKCXtLonmO2DXIQyf2') {
+    if (user == null || !allowedUserIds.contains(user.uid)) {
       setState(() {
         _errorMessage = 'No tienes permisos para crear noticias';
         _isSaving = false;
@@ -84,13 +123,10 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
         'dateString': DateFormat('yyyy-MM-dd').format(DateTime.now()),
       };
 
-      await FirebaseFirestore.instance
-          .collection('news')
-          .add(docData);
+      await FirebaseFirestore.instance.collection('news').add(docData);
 
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/news_public');
-      
     } on FirebaseException catch (e) {
       setState(() {
         _errorMessage = 'Error de Firebase: ${e.message}';
@@ -108,7 +144,10 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Crear Noticia (Admin)'), titleTextStyle: TextStyle(
+        iconTheme: const IconThemeData(color: Colors.white),
+
+        title: const Text('Crear Noticia (Admin)'),
+        titleTextStyle: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
           color: Colors.white,
@@ -135,12 +174,27 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
                       fillColor: Colors.grey[100],
                     ),
                     value: _selectedCategory,
-                    items: _categories.map((category) {
-                      return DropdownMenuItem(
-                        value: category,
-                        child: Text(category),
-                      );
-                    }).toList(),
+                    items:
+                        _categories.map((category) {
+                          return DropdownMenuItem(
+                            value: category,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: categoryColors[category],
+                                  ),
+                                ),
+                                Text(category),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+
                     onChanged: (value) {
                       if (value != null) {
                         setState(() => _selectedCategory = value);
@@ -182,10 +236,7 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
                         _errorMessage!,
-                        style: TextStyle(
-                          color: Colors.red[700],
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.red[700], fontSize: 14),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -194,9 +245,10 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
                     controller: _contentController,
                     maxLines: 8,
                     decoration: InputDecoration(
-                      labelText: _urlController.text.isEmpty
-                          ? 'Contenido'
-                          : 'Contenido (opcional cuando hay URL)',
+                      labelText:
+                          _urlController.text.isEmpty
+                              ? 'Contenido'
+                              : 'Contenido (opcional cuando hay URL)',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -216,16 +268,17 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('PUBLICAR NOTICIA'),
+                    child:
+                        _isSaving
+                            ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                            : const Text('PUBLICAR NOTICIA'),
                   ),
                 ],
               ),
@@ -234,9 +287,7 @@ class _NewsAdminCreateScreenState extends State<NewsAdminCreateScreen> {
             if (_isSaving)
               Container(
                 color: Colors.black.withOpacity(0.5),
-                child: const Center(
-                  child: CircularProgressIndicator(),
-                ),
+                child: const Center(child: CircularProgressIndicator()),
               ),
           ],
         ),

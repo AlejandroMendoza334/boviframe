@@ -84,13 +84,16 @@ class _EditProducerScreenState extends State<EditProducerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Editar Productor'),
+        iconTheme: const IconThemeData(color: Colors.white),
+        centerTitle: true, // Centra el título
+        title: const Text(
+          'Editar Productor',
+          style: TextStyle(color: Colors.white), // Color del texto blanco
+        ),
         backgroundColor: Colors.blue[800],
       ),
       body: Padding(
@@ -133,12 +136,9 @@ class _EditProducerScreenState extends State<EditProducerScreen> {
               onPressed: _saveProducer,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 48),
-                backgroundColor: Colors.green[700],
+                backgroundColor: Colors.green[500],
               ),
-              child: const Text(
-                'Guardar',
-                style: TextStyle(fontSize: 16),
-              ),
+              child: const Text('Guardar', style: TextStyle(fontSize: 16)),
             ),
           ],
         ),

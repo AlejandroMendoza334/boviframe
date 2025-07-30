@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import './providers/settings_provider.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:boviframe/widgets/custom_bottom_nav_bar.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -17,7 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _collegeController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
 
-  String _selectedProfession = 'Veterinario';
+  String _selectedProfession = '';
   final List<String> _professions = [
     'Veterinario',
     'Zootecnista',
@@ -48,7 +49,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       final doc =
-          await FirebaseFirestore.instance.collection('usuarios').doc(currentUser.uid).get();
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(currentUser.uid)
+              .get();
 
       if (!mounted) return;
 
@@ -57,7 +61,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final nombre = data['nombre'] ?? '';
         final colegio = data['colegio'] ?? '';
         final ubicacion = data['ubicacion'] ?? '';
-        final profesion = data['profesion'] ?? 'Veterinario';
+        final profesion = data['profesion'];
+        if (profesion != null && _professions.contains(profesion)) {
+          _selectedProfession = profesion;
+        } else {
+          _selectedProfession = _professions.first;
+        }
         final email = _user?.email ?? '';
 
         setState(() {
@@ -101,12 +110,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final newProf = _selectedProfession;
       final newEmail = _user?.email ?? '';
 
-      await FirebaseFirestore.instance.collection('usuarios').doc(currentUser.uid).set({
-        'nombre': newName,
-        'colegio': newCole,
-        'ubicacion': newUbic,
-        'profesion': newProf,
-      }, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(currentUser.uid)
+          .set({
+            'nombre': newName,
+            'colegio': newCole,
+            'ubicacion': newUbic,
+            'profesion': newProf,
+          }, SetOptions(merge: true));
 
       context.read<SettingsProvider>().setUserData(
         name: newName,
@@ -129,49 +141,291 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _showAboutDialog() async {
+  Future<void> _deleteAccount() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 32,
+              vertical: 24,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 48,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '¿Eliminar cuenta?',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Esta acción eliminará tu cuenta y todos tus datos de forma permanente.\n\n¿Estás completamente seguro?',
+                    style: TextStyle(fontSize: 15),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.grey),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Cancelar'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Eliminar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(user.uid)
+          .delete();
+
+      try {
+        await user.delete();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cuenta eliminada exitosamente')),
+          );
+          Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+        }
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'requires-recent-login') {
+          if (user.providerData.any((p) => p.providerId == 'google.com')) {
+            await _reauthenticateWithGoogleAndDelete(user);
+          } else {
+            _showReauthDialog(); // solo si fue creado con email/contraseña
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al eliminar cuenta: ${e.message}')),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al eliminar datos del usuario: $e')),
+      );
+    }
+  }
+
+  void _showReauthDialog() {
+    final passwordController = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+      builder:
+          (_) => AlertDialog(
+            title: const Text('Reautenticación requerida'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset('assets/icons/logo1.png', width: 60, height: 60),
-                const SizedBox(height: 16),
-                const Text(
-                  'Técnica EPMURAS',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const Divider(height: 28),
-                _buildBenefitTile(Icons.timer_outlined, 'Optimización del tiempo',
-                    'Reduce la duración de las consultas manteniendo la calidad.'),
-                _buildBenefitTile(Icons.track_changes_outlined, 'Diagnósticos precisos',
-                    'Aumenta la certeza en la identificación de patologías.'),
-                _buildBenefitTile(Icons.groups_outlined, 'Mejora la comunicación',
-                    'Facilita la explicación de casos complejos al cliente.'),
-                _buildBenefitTile(Icons.checklist_rtl_outlined, 'Protocolos estandarizados',
-                    'Ofrece una guía clara para un abordaje consistente.'),
-                const SizedBox(height: 20),
-                const Divider(),
-                const Text('Creado por Medico Veterinario Gualdrón Williams',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
-                const Text('Versión: 1.0.0',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cerrar', style: TextStyle(color: Colors.blue)),
+                const Text('Por seguridad, ingresa tu contraseña nuevamente.'),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Contraseña'),
                 ),
               ],
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  final user = FirebaseAuth.instance.currentUser;
+                  final email = user?.email;
+                  final password = passwordController.text.trim();
+
+                  if (email != null && password.isNotEmpty) {
+                    try {
+                      final cred = EmailAuthProvider.credential(
+                        email: email,
+                        password: password,
+                      );
+                      await user!.reauthenticateWithCredential(cred);
+                      await user.delete();
+
+                      if (mounted) {
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/login',
+                          (_) => false,
+                        );
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Error al reautenticar o eliminar la cuenta.',
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text(
+                  'Confirmar',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-        ),
-      ),
+    );
+  }
+
+  Future<void> _reauthenticateWithGoogleAndDelete(User user) async {
+    try {
+      final googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return;
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+      await user.delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cuenta eliminada exitosamente')),
+        );
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al reautenticar con Google: $e')),
+      );
+    }
+  }
+
+  Future<void> _showAboutDialog() async {
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 24,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      'assets/icons/logo1.png',
+                      width: 60,
+                      height: 60,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Técnica EPMURAS',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Divider(height: 28),
+                    _buildBenefitTile(
+                      Icons.timer_outlined,
+                      'Optimización del tiempo',
+                      'Reduce la duración de las consultas manteniendo la calidad.',
+                    ),
+                    _buildBenefitTile(
+                      Icons.track_changes_outlined,
+                      'Diagnósticos precisos',
+                      'Aumenta la certeza en la identificación de patologías.',
+                    ),
+                    _buildBenefitTile(
+                      Icons.groups_outlined,
+                      'Mejora la comunicación',
+                      'Facilita la explicación de casos complejos al cliente.',
+                    ),
+                    _buildBenefitTile(
+                      Icons.checklist_rtl_outlined,
+                      'Protocolos estandarizados',
+                      'Ofrece una guía clara para un abordaje consistente.',
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(),
+                    const Text(
+                      'Creado por Medico Veterinario Gualdrón Williams',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const Text(
+                      'Versión: 1.0.1',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text(
+                        'Cerrar',
+                        style: TextStyle(color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
     );
   }
 
@@ -187,7 +441,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
                 const SizedBox(height: 2),
                 Text(subtitle, style: const TextStyle(fontSize: 13)),
               ],
@@ -216,8 +476,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blue[800],
-        centerTitle: true,
-        title: const Text('Configuración', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Configuración',
+          style: TextStyle(color: Colors.white),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: LayoutBuilder(
@@ -237,15 +499,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: _selectedProfession,
-                        items: _professions.map((p) {
-                          return DropdownMenuItem(value: p, child: Text(p));
-                        }).toList(),
+                        value:
+                            _professions.contains(_selectedProfession)
+                                ? _selectedProfession
+                                : null,
+                        items:
+                            _professions.map((p) {
+                              return DropdownMenuItem(value: p, child: Text(p));
+                            }).toList(),
                         onChanged: (v) {
-                          if (v != null) setState(() => _selectedProfession = v);
+                          if (v != null)
+                            setState(() => _selectedProfession = v);
                         },
                         decoration: _styledInputDecoration('Profesión'),
                       ),
+
                       const SizedBox(height: 12),
                       TextField(
                         controller: _collegeController,
@@ -254,7 +522,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _locationController,
-                        decoration: _styledInputDecoration('Ubicación, Estado, País'),
+                        decoration: _styledInputDecoration(
+                          'Ubicación, Estado, País',
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -281,9 +551,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Card(
                         elevation: 2,
                         child: ListTile(
-                          leading: const Icon(Icons.info_outline, color: Colors.blue),
+                          leading: const Icon(
+                            Icons.info_outline,
+                            color: Colors.blue,
+                          ),
                           title: const Text('Acerca de BOVIFrame'),
-                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          trailing: const Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                          ),
                           onTap: _showAboutDialog,
                         ),
                       ),
@@ -296,8 +572,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onTap: () async {
                             if (!mounted) return;
                             await FirebaseAuth.instance.signOut();
-                            Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
+                            Navigator.pushNamedAndRemoveUntil(
+                              context,
+                              '/login',
+                              (_) => false,
+                            );
                           },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Card(
+                        elevation: 2,
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.delete_forever,
+                            color: Colors.red,
+                          ),
+                          title: Text('Eliminar cuenta'),
+                          onTap: _deleteAccount,
                         ),
                       ),
                     ],
@@ -308,7 +600,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           );
         },
       ),
-      bottomNavigationBar: const CustomBottomNavBar(currentIndex: 4), // 👈 AQUÍ ESTÁ EL MENÚ
+      bottomNavigationBar: const CustomBottomNavBar(currentIndex: 4),
     );
   }
 }

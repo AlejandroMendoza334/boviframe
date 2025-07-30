@@ -1,5 +1,3 @@
-// lib/screens/datos_productor_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,14 +10,14 @@ class DatosProductorScreen extends StatefulWidget {
   final String sessionId;
 
   const DatosProductorScreen({Key? key, required this.sessionId})
-      : super(key: key);
+    : super(key: key);
 
   @override
   State<DatosProductorScreen> createState() => _DatosProductorScreenState();
 }
 
 class _DatosProductorScreenState extends State<DatosProductorScreen> {
-  final _unidadController    = TextEditingController();
+  final _unidadController = TextEditingController();
   final _ubicacionController = TextEditingController();
   final _municipioController = TextEditingController();
   String? _estadoSeleccionado;
@@ -40,8 +38,10 @@ class _DatosProductorScreenState extends State<DatosProductorScreen> {
     };
 
     // 2) Guardar localmente en el provider:
-    Provider.of<SessionProvider>(context, listen: false)
-        .setDatosProductor(produtorMap);
+    Provider.of<SessionProvider>(
+      context,
+      listen: false,
+    ).setDatosProductor(produtorMap);
 
     // 3) Escribir en Firestore en /sesiones/{sessionId}/datos_productor/info
     try {
@@ -76,119 +76,142 @@ class _DatosProductorScreenState extends State<DatosProductorScreen> {
   }
 
   @override
-  void dispose() {
-    _unidadController.dispose();
-    _ubicacionController.dispose();
-    _municipioController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return CustomAppScaffold(
       currentIndex: 2,
-      title: 'Datos Productor',
+      title: 'Datos del Productor',
       showBackButton: true,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Datos Productor',
-              style: TextStyle(
-                fontFamily: 'Courier',
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            const Divider(thickness: 1),
-            const SizedBox(height: 12),
-
-            _buildLabeledInput('Unidad de Producción', _unidadController),
-            const SizedBox(height: 12),
-
-            _buildLabeledInput('Ubicación', _ubicacionController),
-            const SizedBox(height: 12),
-
-            _buildLabeledDropdown('Estado', _estadosVenezuela),
-            const SizedBox(height: 12),
-
-            _buildLabeledInput('Municipio', _municipioController),
-            const SizedBox(height: 40),
-
-            Align(
-              alignment: Alignment.bottomRight,
-              child: ElevatedButton(
-                onPressed: _guardarProductorYContinuar,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[700],
-                  shape: const CircleBorder(),
-                  padding: const EdgeInsets.all(16),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            key: const ValueKey('formulario_productor'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AnimatedOpacity(
+                opacity: 1,
+                duration: const Duration(milliseconds: 500),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Información del Productor',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Completa estos datos para continuar con la evaluación',
+                      style: TextStyle(fontSize: 14, color: Colors.black54),
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.arrow_forward, color: Colors.white),
               ),
-            ),
-          ],
+              const SizedBox(height: 30),
+
+              _buildCardField(
+                'Unidad de Producción',
+                _unidadController,
+                Icons.home_work,
+              ),
+              const SizedBox(height: 16),
+
+              _buildCardField('Ubicación', _ubicacionController, Icons.place),
+              const SizedBox(height: 16),
+
+              _buildCardDropdown('Estado', _estadoSeleccionado, (val) {
+                setState(() => _estadoSeleccionado = val);
+              }),
+              const SizedBox(height: 16),
+
+              _buildCardField(
+                'Municipio',
+                _municipioController,
+                Icons.location_city,
+              ),
+              const SizedBox(height: 30),
+
+              Center(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('Guardar y continuar'),
+                  onPressed: _guardarProductorYContinuar,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 4,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildLabeledInput(
-      String label, TextEditingController controller) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 100,
-          child: Text(
-            label,
-            style: const TextStyle(fontFamily: 'Courier', fontSize: 14),
+  Widget _buildCardField(
+    String label,
+    TextEditingController controller,
+    IconData icon,
+  ) {
+    return Material(
+      elevation: 1,
+      borderRadius: BorderRadius.circular(12),
+      color: Colors.white,
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon),
+          labelText: label,
+          filled: true,
+          fillColor: Colors.grey[100],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              isDense: true,
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildLabeledDropdown(String label, List<String> items) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 100,
-          child: Text(
-            label,
-            style: const TextStyle(fontFamily: 'Courier', fontSize: 14),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: DropdownButtonFormField<String>(
-            value: _estadoSeleccionado,
-            items: items
+  Widget _buildCardDropdown(
+    String label,
+    String? value,
+    void Function(String?) onChanged,
+  ) {
+    return Material(
+      elevation: 1,
+      borderRadius: BorderRadius.circular(12),
+      color: Colors.white,
+      child: DropdownButtonFormField<String>(
+        value: value,
+        items:
+            _estadosVenezuela
                 .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                 .toList(),
-            onChanged: (value) => setState(() => _estadoSeleccionado = value),
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              isDense: true,
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            ),
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.map),
+          labelText: label,
+          filled: true,
+          fillColor: Colors.grey[100],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
           ),
         ),
-      ],
+      ),
     );
   }
 

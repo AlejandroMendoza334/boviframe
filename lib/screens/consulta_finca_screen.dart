@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -39,39 +38,42 @@ class _ConsultaFincaScreenState extends State<ConsultaFincaScreen> {
   }
 
   Future<void> _loadFincas() async {
+    final userId = FirebaseAuth.instance.currentUser!.uid;
+    if (!mounted) return;
+
     setState(() {
       _loading = true;
       _error = null;
     });
-    try {
-      // Si tus reglas lo requieren:
-      if (FirebaseAuth.instance.currentUser == null) {
-        await FirebaseAuth.instance.signInAnonymously();
-      }
 
-      final snap =
-          await FirebaseFirestore.instance
-              .collectionGroup('datos_productor')
-              .get();
+    try {
+      final querySnapshot =
+          await FirebaseFirestore.instance.collection('sesiones').get();
 
       final temp = <Map<String, dynamic>>[];
-      for (var doc in snap.docs) {
-        final d = doc.data() as Map<String, dynamic>;
-        final parent = doc.reference.parent.parent;
-        if (parent == null) continue;
-        final parentSnap = await parent.get();
-        final numSes = (parentSnap.data()?['numero_sesion'] ?? '').toString();
 
-        temp.add({
-          'unidad_produccion': d['unidad_produccion'] ?? '',
-          'ubicacion': d['ubicacion'] ?? '',
-          'municipio': d['municipio'] ?? '',
-          'session_id': parent.id,
-          'numero_sesion': numSes,
-        });
+      for (final sessionDoc in querySnapshot.docs) {
+        final sessionId = sessionDoc.id;
+        final datosSnapshot =
+            await sessionDoc.reference
+                .collection('datos_productor')
+                .where('userId', isEqualTo: userId)
+                .get();
+
+        for (final doc in datosSnapshot.docs) {
+          final d = doc.data();
+          final numSes = (sessionDoc.data()['numero_sesion'] ?? '').toString();
+
+          temp.add({
+            'unidad_produccion': d['unidad_produccion'] ?? '',
+            'ubicacion': d['ubicacion'] ?? '',
+            'municipio': d['municipio'] ?? '',
+            'session_id': sessionId,
+            'numero_sesion': numSes,
+          });
+        }
       }
 
-      // Agrupo por unidad_produccion
       final mapa = <String, Map<String, dynamic>>{};
       for (var item in temp) {
         final finca = item['unidad_produccion'] as String;
@@ -90,13 +92,15 @@ class _ConsultaFincaScreenState extends State<ConsultaFincaScreen> {
         });
       }
 
-      _allFincas = mapa.values.toList();
-      _filteredFincas = List.from(_allFincas);
+      if (!mounted) return;
 
       setState(() {
+        _allFincas = mapa.values.toList();
+        _filteredFincas = List.from(_allFincas);
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Error cargando fincas: $e';
         _loading = false;
@@ -133,89 +137,81 @@ class _ConsultaFincaScreenState extends State<ConsultaFincaScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) {
-        final mq = MediaQuery.of(ctx);
+      builder: (_) {
         return Padding(
           padding: EdgeInsets.only(
-            bottom: mq.viewInsets.bottom + 16,
-            left: 16,
-            right: 16,
-            top: 8,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            left: 24,
+            right: 24,
+            top: 24,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // “handle” decorativo
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Filtros adicionales',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-              ),
-
-              const Text(
-                'Filtros avanzados',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-
-              TextField(
-                decoration: const InputDecoration(
-                  labelText: 'Unidad de producción',
+                const SizedBox(height: 16),
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Unidad de producción',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) => _filtroUnidad = v,
                 ),
-                onChanged: (v) => _filtroUnidad = v,
-              ),
-              const SizedBox(height: 12),
-
-              TextField(
-                decoration: const InputDecoration(labelText: 'Ubicación'),
-                onChanged: (v) => _filtroUbicacion = v,
-              ),
-              const SizedBox(height: 12),
-
-              TextField(
-                decoration: const InputDecoration(labelText: 'Municipio'),
-                onChanged: (v) => _filtroMunicipio = v,
-              ),
-              const SizedBox(height: 20),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        // Limpiar solo los filtros avanzados
-                        setState(() {
-                          _filtroUnidad = '';
-                          _filtroUbicacion = '';
-                          _filtroMunicipio = '';
-                        });
-                      },
-                      child: const Text('LIMPIAR FILTROS'),
+                const SizedBox(height: 12),
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Ubicación',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) => _filtroUbicacion = v,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Municipio',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) => _filtroMunicipio = v,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _applyFilters();
+                  },
+                  icon: const Icon(Icons.check),
+                  label: const Text('APLICAR FILTROS'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        _applyFilters();
-                      },
-                      child: const Text('APLICAR'),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                  label: const Text('CERRAR FILTROS'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-            ],
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         );
       },
@@ -227,6 +223,8 @@ class _ConsultaFincaScreenState extends State<ConsultaFincaScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blue[800],
+        iconTheme: const IconThemeData(color: Colors.white),
+
         centerTitle: true,
         title: const Text(
           'Consultar Fincas',
@@ -237,20 +235,17 @@ class _ConsultaFincaScreenState extends State<ConsultaFincaScreen> {
       body: Column(
         children: [
           const SizedBox(height: 12),
-
-          // ───────── Buscador ─────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.search),
-                    hintText: 'Unidad de producción',
+                    hintText: 'Buscar Fincas',
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
@@ -260,7 +255,10 @@ class _ConsultaFincaScreenState extends State<ConsultaFincaScreen> {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _showFilterSheet,
-                        icon: const Icon(Icons.filter_list),
+                        icon: const Icon(
+                          Icons.filter_list,
+                          color: Colors.white,
+                        ),
                         label: const Text(
                           'FILTROS',
                           style: TextStyle(color: Colors.white),
@@ -268,6 +266,9 @@ class _ConsultaFincaScreenState extends State<ConsultaFincaScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue[500],
                           minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                     ),
@@ -275,15 +276,17 @@ class _ConsultaFincaScreenState extends State<ConsultaFincaScreen> {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _applyFilters,
-                        icon: const Icon(Icons.search),
+                        icon: const Icon(Icons.search, color: Colors.white),
                         label: const Text(
                           'BUSCAR',
                           style: TextStyle(color: Colors.white),
                         ),
-
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue[500],
                           minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                     ),
@@ -293,16 +296,11 @@ class _ConsultaFincaScreenState extends State<ConsultaFincaScreen> {
             ),
           ),
           const SizedBox(height: 12),
-
-          if (_error != null) ...[
+          if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(_error!, style: const TextStyle(color: Colors.red)),
             ),
-            const SizedBox(height: 12),
-          ],
-
-          // ───────── Lista ─────────
           Expanded(
             child:
                 _loading
@@ -318,50 +316,131 @@ class _ConsultaFincaScreenState extends State<ConsultaFincaScreen> {
                         final sessions = List<Map<String, dynamic>>.from(
                           finca['sesiones'] as List,
                         );
-                        return Card(
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                            border: Border.all(color: Colors.grey.shade200),
                           ),
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Finca: ${finca['unidad_produccion']}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text('Ubicación: ${finca['ubicacion']}'),
-                                Text('Municipio: ${finca['municipio']}'),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Sesiones: ${sessions.length}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (_) => SesionesScreen(
-                                                finca:
-                                                    finca['unidad_produccion'],
-                                                sesiones: sessions,
-                                              ),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.agriculture,
+                                      color: Colors.blueAccent,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        finca['unidad_produccion'],
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
                                         ),
-                                      );
-                                    },
-                                    child: const Text('Ver sesiones'),
-                                  ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on,
+                                      size: 18,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        finca['ubicacion'],
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.map,
+                                      size: 18,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        finca['municipio'],
+                                        style: const TextStyle(
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Divider(height: 20),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.list_alt,
+                                          size: 20,
+                                          color: Colors.blue,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${sessions.length} sesiones',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (_) => SesionesScreen(
+                                                  finca:
+                                                      finca['unidad_produccion'],
+                                                  sesiones: sessions,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blueAccent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Ver sesiones',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

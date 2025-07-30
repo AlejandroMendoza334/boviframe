@@ -30,6 +30,8 @@ class _ConsultaScreenState extends State<ConsultaScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+
         title: const Text(
           'CONSULTA PÚBLICA',
           style: TextStyle(color: Colors.white),

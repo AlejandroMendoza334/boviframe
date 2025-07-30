@@ -94,6 +94,8 @@ class ForgotPasswordScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+
         title: const Text('Recuperar Contraseña', style: TextStyle(color: Colors.white)),
         centerTitle: true,
         backgroundColor: Colors.blue[800],

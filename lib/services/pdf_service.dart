@@ -15,6 +15,7 @@ class PdfService {
     Uint8List? barImage,
   }) async {
     // Autenticación anónima
+    final comentarios = (data['comentarios']?.toString() ?? '').trim();
 
     // 1) Datos básicos
     final numero = data['numero']?.toString() ?? '';
@@ -43,7 +44,7 @@ class PdfService {
       if (prodSnap.docs.isNotEmpty) {
         final p = prodSnap.docs.first.data();
         producText =
-            'Productor: ${p['unidad_produccion'] ?? '-'} ${p['estado'] ?? '-'}';
+            'Productor: ${p['unidad_produccion'] ?? '-'},  ${p['estado'] ?? '-'}';
       }
     }
 
@@ -147,7 +148,7 @@ class PdfService {
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(24),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         build:
             (_) => [
               // Header
@@ -327,12 +328,13 @@ class PdfService {
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
-              for (var i = 0; i < 5; i++)
-                pw.Container(
-                  margin: const pw.EdgeInsets.symmetric(vertical: 6),
-                  height: 1,
-                  color: PdfColors.grey300,
-                ),
+              pw.SizedBox(height: 6),
+              comentarios.isNotEmpty
+                  ? pw.Text(comentarios, style: pw.TextStyle(fontSize: 10))
+                  : pw.Text(
+                    'Sin comentarios.',
+                    style: pw.TextStyle(fontSize: 10, color: PdfColors.grey),
+                  ),
 
               // Evaluador + firma
               pw.SizedBox(height: 12),

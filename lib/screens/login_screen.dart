@@ -79,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
             'name': user.displayName ?? '',
             'email': user.email,
             'company': '',
-            'profesion': 'Google',
+            'profesion': '',
             'ubicacion': '',
           });
         }

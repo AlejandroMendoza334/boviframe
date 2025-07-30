@@ -27,12 +27,38 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
   final GlobalKey _radarKey = GlobalKey();
   final GlobalKey _barKey = GlobalKey();
 
+  List<Map<String, dynamic>> historialEvaluaciones = [];
+
+  Future<void> loadHistorial() async {
+    final registro = widget.animalData['registro'];
+    final sessionId = widget.animalData['sessionId'];
+
+    if (sessionId == null || registro == null) return;
+
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('sesiones')
+            .doc(sessionId)
+            .collection('evaluaciones_animales')
+            .where('registro', isEqualTo: registro)
+            .orderBy('timestamp', descending: true) // Usa el campo correcto
+            .get();
+
+    if (mounted) {
+      setState(() {
+        historialEvaluaciones = snapshot.docs.map((e) => e.data()).toList();
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _prepareData();
     _loadPromedios();
     _loadProducer();
+    loadHistorial();
+    print("Historial cargado: ${historialEvaluaciones.length}");
   }
 
   void _prepareData() {
@@ -161,7 +187,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
             (_) => Scaffold(
               appBar: AppBar(
                 title: const Text('Vista previa PDF'),
-                leading: BackButton(), 
+                leading: BackButton(),
               ),
               body: PdfPreview(
                 allowPrinting: true,
@@ -181,7 +207,12 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detalles del Animal', style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
+
+        title: const Text(
+          'Detalles del Animal',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.blue[800],
         centerTitle: true,
       ),
@@ -278,6 +309,24 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                 ),
               ),
             ),
+            if (historialEvaluaciones.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              const Text(
+                'Historial de Evaluaciones',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ...historialEvaluaciones.map(
+                (eval) => Card(
+                  child: ListTile(
+                    title: Text("Fecha: ${eval['fecha'] ?? '—'}"),
+                    subtitle: Text(
+                      "EPMURAS: ${eval['epmuras']?.toString() ?? '—'}",
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -389,7 +438,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
-                LegendDot(color: Colors.blue, label: 'Animal Eval.'),
+                LegendDot(color: Colors.blue, label: 'Animal Evaluado'),
                 SizedBox(width: 16),
                 LegendDot(color: Colors.orange, label: 'Promedio Sesión'),
               ],

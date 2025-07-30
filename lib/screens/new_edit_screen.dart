@@ -1,11 +1,8 @@
-// lib/screens/news_edit_screen.dart
-
-import 'dart:io';
-import 'package:flutter/foundation.dart'; // para kIsWeb
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+import 'package:intl/intl.dart';
 
 class NewsEditScreen extends StatefulWidget {
   final String documentId;
@@ -17,50 +14,62 @@ class NewsEditScreen extends StatefulWidget {
 }
 
 class _NewsEditScreenState extends State<NewsEditScreen> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  bool _isLoading = true;
-  bool _isSaving = false;
-
-  // Controladores y variables del formulario
   final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _urlController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
-  File? _pickedImage;
-  String? _existingImageUrl;
-  String _selectedCategory = 'General';
-  final List<String> _categories = ['General', 'Evento', 'Anuncio', 'Otro'];
+  bool _isSaving = false;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  final Map<String, Color> categoryColors = {
+    'Educación': Colors.deepPurple.shade100,
+    'Ciencia': Colors.teal.shade100,
+    'Manejo': Colors.blue.shade100,
+    'Reproducción': Colors.orange.shade100,
+    'Genética': Colors.green.shade100,
+    'Sanidad': Colors.red.shade100,
+    'Agricultura': Colors.brown.shade100,
+    'Otras noticias': Colors.grey.shade300,
+  };
+
+  final List<String> _categories = [
+    'Educación',
+    'Ciencia',
+    'Manejo',
+    'Reproducción',
+    'Genética',
+    'Sanidad',
+    'Agricultura',
+    'Otras noticias',
+  ];
+  String _selectedCategory = 'Educación';
 
   @override
   void initState() {
     super.initState();
     _loadExistingData();
+    controller =
+        WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..loadRequest(Uri.parse('https://flutter.dev'));
   }
 
   Future<void> _loadExistingData() async {
     try {
       final doc =
-          await _firestore.collection('news').doc(widget.documentId).get();
-      if (!doc.exists) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Noticia no encontrada.'),
-          backgroundColor: Colors.red,
-        ));
-        Navigator.of(context).pop();
-        return;
+          await FirebaseFirestore.instance
+              .collection('news')
+              .doc(widget.documentId)
+              .get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        _titleController.text = (data['title'] ?? '') as String;
+        _urlController.text = (data['externalUrl'] ?? '') as String;
+        _contentController.text = (data['content'] ?? '') as String;
+        _selectedCategory = (data['category'] ?? 'Educación') as String;
       }
-
-      final data = doc.data()!;
-      _titleController.text = (data['title'] as String?) ?? '';
-      _contentController.text = (data['content'] as String?) ?? '';
-      _existingImageUrl = data['imageUrl'] as String?;
-      _selectedCategory = (data['category'] as String?) ?? 'General';
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error al cargar: $e'),
-        backgroundColor: Colors.red,
-      ));
-      Navigator.of(context).pop();
-      return;
+      _errorMessage = 'Error al cargar la noticia';
     } finally {
       setState(() {
         _isLoading = false;
@@ -68,65 +77,66 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
     }
   }
 
-  Future<void> _pickImage() async {
-    if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Seleccionar imagen no está disponible en Web.'),
-        ),
-      );
-      return;
+  Future<void> loadWebPage(String rawUrl) async {
+    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+      rawUrl = 'https://$rawUrl';
     }
-    final pickedFile =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _pickedImage = File(pickedFile.path);
-      });
-    }
+    final uri = Uri.parse(rawUrl);
+
+    await controller.loadRequest(uri);
   }
 
+  late WebViewController controller;
+
   Future<void> _saveChanges() async {
-    final newTitle = _titleController.text.trim();
-    final newContent = _contentController.text.trim();
-    if (newTitle.isEmpty || newContent.isEmpty) return;
+    final title = _titleController.text.trim();
+    final url = _urlController.text.trim();
+    final content = _contentController.text.trim();
+
+    if (title.isEmpty && url.isEmpty) {
+      setState(() {
+        _errorMessage = 'Debe ingresar al menos un título o URL válida';
+      });
+      return;
+    }
 
     setState(() {
       _isSaving = true;
+      _errorMessage = null;
     });
 
-    String? newImageUrl = _existingImageUrl;
-
-    // Si seleccionó una imagen nueva, subimos y reemplazamos la URL:
-    if (_pickedImage != null) {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final storageRef =
-          FirebaseStorage.instance.ref().child('news_images/$fileName');
-      await storageRef.putFile(_pickedImage!);
-      newImageUrl = await storageRef.getDownloadURL();
+    try {
+      await FirebaseFirestore.instance
+          .collection('news')
+          .doc(widget.documentId)
+          .update({
+            'title': title.isNotEmpty ? title : 'Sin título',
+            'externalUrl': url.isNotEmpty ? url : null,
+            'content': content.isNotEmpty ? content : null,
+            'category': _selectedCategory,
+            'timestamp': FieldValue.serverTimestamp(),
+            'dateString': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+          });
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error al guardar los cambios';
+      });
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
     }
-
-    // Actualizamos el documento en Firestore:
-    await _firestore.collection('news').doc(widget.documentId).update({
-      'title': newTitle,
-      'content': newContent,
-      'category': _selectedCategory,
-      'imageUrl': newImageUrl,
-      'timestamp': FieldValue.serverTimestamp(), // refrescar timestamp
-    });
-
-    setState(() {
-      _isSaving = false;
-    });
-
-    Navigator.of(context).pop(); // Regresa a la pantalla de administración
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Editar Noticia (Admin)'), titleTextStyle: const TextStyle(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Editar Noticia (Admin)'),
+        titleTextStyle: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
           color: Colors.white,
@@ -134,117 +144,136 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
         backgroundColor: Colors.blue.shade800,
         centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator())
-          else
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Título
-                  TextField(
-                    controller: _titleController,
-                    decoration: const InputDecoration(labelText: 'Título'),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Categoría
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'Categoría',
-                      border: OutlineInputBorder(),
-                    ),
-                    value: _selectedCategory,
-                    items: _categories.map((cat) {
-                      return DropdownMenuItem(
-                        value: cat,
-                        child: Text(cat),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _selectedCategory = val;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Botón para seleccionar nueva imagen
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.image),
-                    label: const Text('Seleccionar imagen'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade200,
-                    ),
-                    onPressed: _isSaving ? null : _pickImage,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Vista previa: si hay imagen nueva, muéstrala; si no, la URL existente:
-                  if (_pickedImage != null)
-                    if (kIsWeb)
-                      Container(
-                        height: 200,
-                        color: Colors.grey.shade200,
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'Vista previa no disponible en Web',
-                          style: TextStyle(color: Colors.grey),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
+            else
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      decoration: InputDecoration(
+                        labelText: 'Categoría',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      )
-                    else
-                      Image.file(
-                        _pickedImage!,
-                        height: 200,
-                        fit: BoxFit.cover,
-                      )
-                  else if (_existingImageUrl != null)
-                    Image.network(
-                      _existingImageUrl!,
-                      height: 200,
-                      fit: BoxFit.cover,
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                      value: _selectedCategory,
+                      items:
+                          _categories.map((category) {
+                            return DropdownMenuItem(
+                              value: category,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    margin: const EdgeInsets.only(right: 8),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: categoryColors[category],
+                                    ),
+                                  ),
+                                  Text(category),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _selectedCategory = value);
+                        }
+                      },
                     ),
-                  if (_pickedImage != null || _existingImageUrl != null)
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: _titleController,
+                      decoration: InputDecoration(
+                        labelText: 'Título',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                    ),
                     const SizedBox(height: 16),
-
-                  // Contenido
-                  TextField(
-                    controller: _contentController,
-                    maxLines: 8,
-                    decoration: const InputDecoration(
-                      labelText: 'Contenido de la noticia',
-                      border: OutlineInputBorder(),
+                    TextFormField(
+                      controller: _urlController,
+                      decoration: InputDecoration(
+                        labelText: 'URL Externa (opcional)',
+                        hintText: 'https://www.ejemplo.com/noticia.html',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                      keyboardType: TextInputType.url,
                     ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Botón Guardar Cambios
-                  Center(
-                    child: ElevatedButton(
+                    const SizedBox(height: 16),
+                    if (_errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    TextFormField(
+                      controller: _contentController,
+                      maxLines: 8,
+                      decoration: InputDecoration(
+                        labelText:
+                            _urlController.text.isEmpty
+                                ? 'Contenido'
+                                : 'Contenido (opcional cuando hay URL)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
                       onPressed: _isSaving ? null : _saveChanges,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade200,
+                        backgroundColor: Colors.blue[800],
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: const Text('Guardar Cambios'),
+                      child:
+                          _isSaving
+                              ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Text('GUARDAR CAMBIOS'),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-
-          // Loader superpuesto mientras guarda
-          if (_isSaving)
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              alignment: Alignment.center,
-              child: const CircularProgressIndicator(color: Colors.white),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

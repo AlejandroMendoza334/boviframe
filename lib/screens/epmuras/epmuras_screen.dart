@@ -9,6 +9,8 @@ class EpmurasScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+
         backgroundColor: Colors.blue[800],
         title: const Text(
           'Evaluaciones EPMURAS',

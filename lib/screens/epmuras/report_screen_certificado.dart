@@ -71,6 +71,8 @@ class ReportScreenCertificado extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+
         title: const Text("Certificado del Animal"),
         actions: [
           IconButton(
@@ -83,28 +85,40 @@ class ReportScreenCertificado extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
 
         child: ListView(
-  children: [
-    Text("Nombre o ID: ${animalData['nombre'] ?? '-'}", style: TextStyle(fontSize: 18)),
-    Text("RGN: ${animalData['rgn'] ?? '-'}"),
-    Text("Sexo: ${animalData['sexo'] ?? '-'}"),
-    Text("Estado: ${animalData['estado'] ?? '-'}"),
-    Text("Peso: ${animalData['peso'] ?? '-'}"),
-    const SizedBox(height: 16),
-    const Text("EPMURAS:", style: TextStyle(fontWeight: FontWeight.bold)),
-    Text("E: ${animalData['E'] ?? '-'}"),
-    Text("P: ${animalData['P'] ?? '-'}"),
-    Text("M: ${animalData['M'] ?? '-'}"),
-    Text("U: ${animalData['U'] ?? '-'}"),
-    Text("R: ${animalData['R'] ?? '-'}"),
-    Text("A: ${animalData['A'] ?? '-'}"),
-    Text("S: ${animalData['S'] ?? '-'}"),
-    
-    const SizedBox(height: 24),
-    Text("Comparación visual EPM:", style: TextStyle(fontWeight: FontWeight.bold)),
-    SizedBox(height: 200, child: ComparacionEPMChart(evaluations: [animalData])),
-  ],
-)
+          children: [
+            Text(
+              "Nombre o ID: ${animalData['nombre'] ?? '-'}",
+              style: TextStyle(fontSize: 18),
+            ),
+            Text("RGN: ${animalData['rgn'] ?? '-'}"),
+            Text("Sexo: ${animalData['sexo'] ?? '-'}"),
+            Text("Estado: ${animalData['estado'] ?? '-'}"),
+            Text("Peso: ${animalData['peso'] ?? '-'}"),
+            const SizedBox(height: 16),
+            const Text(
+              "EPMURAS:",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text("E: ${animalData['E'] ?? '-'}"),
+            Text("P: ${animalData['P'] ?? '-'}"),
+            Text("M: ${animalData['M'] ?? '-'}"),
+            Text("U: ${animalData['U'] ?? '-'}"),
+            Text("R: ${animalData['R'] ?? '-'}"),
+            Text("A: ${animalData['A'] ?? '-'}"),
+            Text("S: ${animalData['S'] ?? '-'}"),
+
+            const SizedBox(height: 24),
+            Text(
+              "Comparación visual EPM:",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(
+              height: 200,
+              child: ComparacionEPMChart(evaluations: [animalData]),
+            ),
+          ],
         ),
-      );
+      ),
+    );
   }
 }

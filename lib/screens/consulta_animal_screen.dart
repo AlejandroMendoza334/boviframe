@@ -1,7 +1,6 @@
-
 import 'dart:convert';
 import 'dart:typed_data';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -13,15 +12,15 @@ class ConsultaAnimalScreen extends StatefulWidget {
 }
 
 class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
-  final TextEditingController _rgnController     = TextEditingController();
-  final TextEditingController _sexoController    = TextEditingController();
-  final TextEditingController _estadoController  = TextEditingController();
-  final TextEditingController _sesionController  = TextEditingController();
+  final TextEditingController _rgnController = TextEditingController();
+  final TextEditingController _sexoController = TextEditingController();
+  final TextEditingController _estadoController = TextEditingController();
+  final TextEditingController _sesionController = TextEditingController();
 
-  bool _loading       = true;
+  bool _loading = true;
   String? _errorMsg;
-  List<Map<String, dynamic>> _todosLosDocs   = [];
-  List<Map<String, dynamic>> _resultados     = [];
+  List<Map<String, dynamic>> _todosLosDocs = [];
+  List<Map<String, dynamic>> _resultados = [];
 
   @override
   void initState() {
@@ -39,58 +38,58 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
   }
 
   Future<void> _cargarTodasLasEvaluaciones() async {
+    if (!mounted) return;
     setState(() {
-      _loading  = true;
+      _loading = true;
       _errorMsg = null;
       _todosLosDocs.clear();
       _resultados.clear();
     });
 
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collectionGroup('evaluaciones_animales')
-          .get();
+      final userId = FirebaseAuth.instance.currentUser!.uid;
 
-      final futuros = querySnapshot.docs.map((doc) async {
-        final data = <String, dynamic>{}..addAll(doc.data() as Map<String, dynamic>);
-        data['evalId'] = doc.id;
+      final sesionesSnapshot =
+          await FirebaseFirestore.instance.collection('sesiones').get();
 
-        String sessionId = '';
-        if (doc.reference.parent.parent != null) {
-          sessionId = doc.reference.parent.parent!.id;
+      final docsTotales = <Map<String, dynamic>>[];
+
+      for (final sesionDoc in sesionesSnapshot.docs) {
+        final evalSnapshot =
+            await sesionDoc.reference
+                .collection('evaluaciones_animales')
+                .where('usuarioId', isEqualTo: userId)
+                .get();
+
+        for (final evalDoc in evalSnapshot.docs) {
+          final data = <String, dynamic>{}..addAll(evalDoc.data());
+          data['evalId'] = evalDoc.id;
+          data['session_id'] = sesionDoc.id;
+          data['numero_sesion'] =
+              (sesionDoc.data()['numero_sesion'] ?? '—').toString();
+          docsTotales.add(data);
         }
-        data['session_id'] = sessionId;
+      }
 
-        String numeroSesionPadre = '—';
-        if (doc.reference.parent.parent != null) {
-          final parentSnap = await doc.reference.parent.parent!.get();
-          if (parentSnap.exists) {
-            numeroSesionPadre = (parentSnap.data()?['numero_sesion'] ?? '—').toString();
-          }
-        }
-        data['numero_sesion'] = numeroSesionPadre;
-
-        return data;
-      }).toList();
-
-      final listaConSesiones = await Future.wait(futuros);
-
+      if (!mounted) return;
       setState(() {
-        _todosLosDocs = listaConSesiones;
-        _resultados   = List.from(_todosLosDocs);
-        _loading      = false;
+        _todosLosDocs = docsTotales;
+        _resultados = List.from(_todosLosDocs);
+        _loading = false;
       });
+
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMsg = 'Error cargando evaluaciones: $e';
-        _loading  = false;
+        _loading = false;
       });
     }
   }
 
   Future<void> _buscarAnimales() async {
-    final rgnFilter    = _rgnController.text.trim();
-    final sexoFilter   = _sexoController.text.trim();
+    final rgnFilter = _rgnController.text.trim();
+    final sexoFilter = _sexoController.text.trim();
     final estadoFilter = _estadoController.text.trim();
     final sesionFilter = _sesionController.text.trim();
 
@@ -103,9 +102,10 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
       });
       return;
     }
+    if (!mounted) return;
 
     setState(() {
-      _loading  = true;
+      _loading = true;
       _errorMsg = null;
       _resultados.clear();
     });
@@ -114,15 +114,19 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
       final filtrados = <Map<String, dynamic>>[];
 
       for (final doc in _todosLosDocs) {
-        final registro  = (doc['registro']     ?? '').toString().trim();
-        final sexo      = (doc['sexo']         ?? '').toString().trim();
-        final estado    = (doc['estado']       ?? '').toString().trim();
-        final sessionId = (doc['session_id']   ?? '').toString().trim();
+        final registro = (doc['registro'] ?? '').toString().trim();
+        final sexo = (doc['sexo'] ?? '').toString().trim();
+        final estado = (doc['estado'] ?? '').toString().trim();
+        final sessionId = (doc['session_id'] ?? '').toString().trim();
 
-        bool cumpleRgn    = rgnFilter.isEmpty    || registro == rgnFilter;
-        bool cumpleSexo   = sexoFilter.isEmpty   || sexo.toLowerCase()   == sexoFilter.toLowerCase();
-        bool cumpleEstado = estadoFilter.isEmpty || estado.toLowerCase() == estadoFilter.toLowerCase();
-        bool cumpleSes    = sesionFilter.isEmpty || sessionId == sesionFilter;
+        bool cumpleRgn = rgnFilter.isEmpty || registro == rgnFilter;
+        bool cumpleSexo =
+            sexoFilter.isEmpty ||
+            sexo.toLowerCase() == sexoFilter.toLowerCase();
+        bool cumpleEstado =
+            estadoFilter.isEmpty ||
+            estado.toLowerCase() == estadoFilter.toLowerCase();
+        bool cumpleSes = sesionFilter.isEmpty || sessionId == sesionFilter;
 
         if (cumpleRgn && cumpleSexo && cumpleEstado && cumpleSes) {
           filtrados.add(doc);
@@ -131,12 +135,12 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
 
       setState(() {
         _resultados = filtrados;
-        _loading     = false;
+        _loading = false;
       });
     } catch (e) {
       setState(() {
         _errorMsg = 'Error inesperado al filtrar: $e';
-        _loading  = false;
+        _loading = false;
       });
     }
   }
@@ -231,6 +235,8 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+
         title: const Text(
           'Consultar Animal',
           style: TextStyle(color: Colors.white),
@@ -252,7 +258,10 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 8.0,
+              horizontal: 16.0,
+            ),
             child: Column(
               children: [
                 TextField(
@@ -268,7 +277,10 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _mostrarFiltros,
-                        icon: const Icon(Icons.filter_list, color: Colors.white),
+                        icon: const Icon(
+                          Icons.filter_list,
+                          color: Colors.white,
+                        ),
                         label: const Text(
                           'FILTROS',
                           style: TextStyle(color: Colors.white),
@@ -314,74 +326,90 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
               ),
             ),
           Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : (_resultados.isEmpty
-                    ? const Center(child: Text('No se encontraron animales'))
-                    : ListView.builder(
-                        itemCount: _resultados.length,
-                        itemBuilder: (context, index) {
-                          final data = _resultados[index];
-                          Uint8List? imageBytes;
-                          final imageBase64 = data['image_base64'] as String?;
-                          if (imageBase64 != null && imageBase64.isNotEmpty) {
-                            try {
-                              imageBytes = base64Decode(imageBase64);
-                            } catch (_) {
-                              imageBytes = null;
+            child:
+                _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : (_resultados.isEmpty
+                        ? const Center(
+                          child: Text('No se encontraron animales'),
+                        )
+                        : ListView.builder(
+                          itemCount: _resultados.length,
+                          itemBuilder: (context, index) {
+                            final data = _resultados[index];
+                            Uint8List? imageBytes;
+                            final imageBase64 = data['image_base64'] as String?;
+                            if (imageBase64 != null && imageBase64.isNotEmpty) {
+                              try {
+                                imageBytes = base64Decode(imageBase64);
+                              } catch (_) {
+                                imageBytes = null;
+                              }
                             }
-                          }
-                          double puntuacion = 0;
-                          {
-                            final epm = data['epmuras'] as Map<String, dynamic>? ?? {};
-                            double suma = 0;
-                            int conteo = 0;
-                            epm.forEach((k, v) {
-                              final val = double.tryParse(v?.toString() ?? '') ?? 0.0;
-                              suma += val;
-                              conteo++;
-                            });
-                            if (conteo > 0) puntuacion = suma / conteo;
-                          }
-                          return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: ListTile(
-                              leading: imageBytes != null
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.memory(
-                                        imageBytes,
-                                        width: 40,
-                                        height: 40,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : const Icon(Icons.image_not_supported),
-                              title: Text('N° ${data['numero'] ?? '-'}'),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('RGN: ${data['registro'] ?? '-'}'),
-                                  Text('Sexo: ${data['sexo'] ?? '-'}'),
-                                  Text('Estado: ${data['estado'] ?? '-'}'),
-                                  Text('Sesión: ${data['numero_sesion'] ?? '-'}'),
-                                  Text('Puntuación: ${puntuacion.toStringAsFixed(2)}'),
-                                ],
+                            double puntuacion = 0;
+                            {
+                              final epm =
+                                  data['epmuras'] as Map<String, dynamic>? ??
+                                  {};
+                              double suma = 0;
+                              int conteo = 0;
+                              epm.forEach((k, v) {
+                                final val =
+                                    double.tryParse(v?.toString() ?? '') ?? 0.0;
+                                suma += val;
+                                conteo++;
+                              });
+                              if (conteo > 0) puntuacion = suma / conteo;
+                            }
+                            return Card(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
                               ),
-                              onTap: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/animal_detail',
-                                  arguments: data,
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      )),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: ListTile(
+                                leading:
+                                    imageBytes != null
+                                        ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          child: Image.memory(
+                                            imageBytes,
+                                            width: 40,
+                                            height: 40,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        )
+                                        : const Icon(Icons.image_not_supported),
+                                title: Text('N° ${data['numero'] ?? '-'}'),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('RGN: ${data['registro'] ?? '-'}'),
+                                    Text('Sexo: ${data['sexo'] ?? '-'}'),
+                                    Text('Estado: ${data['estado'] ?? '-'}'),
+                                    Text(
+                                      'Sesión: ${data['numero_sesion'] ?? '-'}',
+                                    ),
+                                    Text(
+                                      'Puntuación: ${puntuacion.toStringAsFixed(2)}',
+                                    ),
+                                  ],
+                                ),
+                                onTap: () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/animal_detail',
+                                    arguments: data,
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        )),
           ),
         ],
       ),

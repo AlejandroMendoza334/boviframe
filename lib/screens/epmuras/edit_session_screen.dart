@@ -101,8 +101,10 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+
         title: const Text('Editar Sesión', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.blue[900],
+        backgroundColor: Colors.blue[800],
         centerTitle: true,
         elevation: 4,
       ),

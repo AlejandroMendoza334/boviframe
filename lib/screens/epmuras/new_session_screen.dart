@@ -1,45 +1,86 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/custom_app_scaffold.dart';
 
-class NewSessionScreen extends StatelessWidget {
+class NewSessionScreen extends StatefulWidget {
   final String? sessionId;
 
-  const NewSessionScreen({Key? key, required this.sessionId})
-      : super(key: key);
+  const NewSessionScreen({Key? key, required this.sessionId}) : super(key: key);
+
+  @override
+  State<NewSessionScreen> createState() => _NewSessionScreenState();
+}
+
+class _NewSessionScreenState extends State<NewSessionScreen> {
+  late Future<int> _futureNumeroSesion;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureNumeroSesion = _generarNumeroSesion();
+  }
+
+  Future<int> _generarNumeroSesion() async {
+    final userId = FirebaseAuth.instance.currentUser!.uid;
+    final snapshot = await FirebaseFirestore.instance
+        .collection('sesiones')
+        .where('userId', isEqualTo: userId)
+        .get();
+    return snapshot.docs.length + 1;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return CustomAppScaffold(
-      currentIndex: 2, // EPMURAS
-      title: 'Nueva Sesión',
-      showBackButton: true,
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40),
-        child: Column(
-          children: [
-            _buildSectionButton(
-              context,
-              label: 'Datos del Productor',
-              onTap: () => Navigator.pushNamed(
-                context,
-                '/datos_productor',
-                arguments: {'sessionId': sessionId},
-              ),
-              highlighted: true,
+    return FutureBuilder<int>(
+      future: _futureNumeroSesion,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final numeroSesion = snapshot.data!;
+        return CustomAppScaffold(
+          currentIndex: 2,
+          title: 'Nueva Sesión',
+          showBackButton: true,
+          body: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40),
+            child: Column(
+              children: [
+                _buildSectionButton(
+                  context,
+                  label: 'Datos del Productor',
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    '/datos_productor',
+                    arguments: {
+                      'sessionId': widget.sessionId,
+                      'numeroSesion': numeroSesion
+                    },
+                  ),
+                  highlighted: true,
+                ),
+                const SizedBox(height: 16),
+                _buildSectionButton(
+                  context,
+                  label: 'Evaluación del Animal',
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    '/animal_evaluation',
+                    arguments: {
+                      'sessionId': widget.sessionId,
+                      'numeroSesion': numeroSesion
+                    },
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            _buildSectionButton(
-              context,
-              label: 'Evaluación del Animal',
-              onTap: () => Navigator.pushNamed(
-                context,
-                '/animal_evaluation',
-                arguments: {'sessionId': sessionId},
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -49,10 +90,7 @@ class NewSessionScreen extends StatelessWidget {
     required VoidCallback onTap,
     bool highlighted = false,
   }) {
-    final Color bgColor = highlighted
-        ? Colors.blue[50]! // Más claridad para botón destacado
-        : Colors.blue[50]!;
-
+    final Color bgColor = Colors.blue[50]!;
     final Color textColor = Colors.blue[800]!;
 
     return SizedBox(
@@ -67,10 +105,8 @@ class NewSessionScreen extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle:
+              const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         child: Text(label),
       ),
