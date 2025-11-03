@@ -22,10 +22,15 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
   List<Map<String, dynamic>> _todosLosDocs = [];
   List<Map<String, dynamic>> _resultados = [];
 
+  bool _initialized = false;
+
   @override
-  void initState() {
-    super.initState();
-    _cargarTodasLasEvaluaciones();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _cargarTodasLasEvaluaciones();
+      _initialized = true;
+    }
   }
 
   @override
@@ -77,7 +82,6 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
         _resultados = List.from(_todosLosDocs);
         _loading = false;
       });
-
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -214,7 +218,7 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
                   icon: const Icon(Icons.close),
                   label: const Text('CERRAR FILTROS'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: const Color.fromARGB(255, 224, 73, 62),
                     minimumSize: const Size(double.infinity, 50),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -249,7 +253,7 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
           const SizedBox(height: 12),
           Center(
             child: Text(
-              'Filtro por RGN',
+              'Busca por RGN',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -361,51 +365,91 @@ class _ConsultaAnimalScreenState extends State<ConsultaAnimalScreen> {
                               });
                               if (conteo > 0) puntuacion = suma / conteo;
                             }
-                            return Card(
+                            return Container(
                               margin: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 8,
                               ),
-                              shape: RoundedRectangleBorder(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.1),
+                                    spreadRadius: 2,
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
                               ),
-                              child: ListTile(
-                                leading:
-                                    imageBytes != null
-                                        ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
+                              child: Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child:
+                                        imageBytes != null
+                                            ? Image.memory(
+                                              imageBytes,
+                                              width: 60,
+                                              height: 60,
+                                              fit: BoxFit.cover,
+                                            )
+                                            : Container(
+                                              width: 60,
+                                              height: 60,
+                                              color: Colors.grey[200],
+                                              child: const Icon(
+                                                Icons.image_not_supported,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Animal Nº ${data['numero'] ?? '-'}',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
                                           ),
-                                          child: Image.memory(
-                                            imageBytes,
-                                            width: 40,
-                                            height: 40,
-                                            fit: BoxFit.cover,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text('RGN: ${data['registro'] ?? '-'}'),
+                                        Text(
+                                          'Sexo: ${data['sexo'] ?? '-'} · Estado: ${data['estado'] ?? '-'}',
+                                        ),
+                                        Text(
+                                          'Sesión: ${data['numero_sesion'] ?? '-'}',
+                                        ),
+                                        Text(
+                                          'Puntuación: ${puntuacion.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.indigo,
                                           ),
-                                        )
-                                        : const Icon(Icons.image_not_supported),
-                                title: Text('N° ${data['numero'] ?? '-'}'),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('RGN: ${data['registro'] ?? '-'}'),
-                                    Text('Sexo: ${data['sexo'] ?? '-'}'),
-                                    Text('Estado: ${data['estado'] ?? '-'}'),
-                                    Text(
-                                      'Sesión: ${data['numero_sesion'] ?? '-'}',
+                                        ),
+                                      ],
                                     ),
-                                    Text(
-                                      'Puntuación: ${puntuacion.toStringAsFixed(2)}',
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 18,
                                     ),
-                                  ],
-                                ),
-                                onTap: () {
-                                  Navigator.pushNamed(
-                                    context,
-                                    '/animal_detail',
-                                    arguments: data,
-                                  );
-                                },
+                                    onPressed: () {
+                                      Navigator.pushNamed(
+                                        context,
+                                        '/animal_detail',
+                                        arguments: data,
+                                      );
+                                    },
+                                  ),
+                                ],
                               ),
                             );
                           },

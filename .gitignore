@@ -47,3 +47,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+.vercel
+
+# Sensitive files - DO NOT COMMIT
+android/app/key.properties
+android/app/keystore-release.jks
+android/app/google-services.json
+android/local.properties
+cert_base64.txt
+cert.pem
+lib/firebase_options.dart

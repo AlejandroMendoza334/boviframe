@@ -40,9 +40,9 @@ class _LoginScreenState extends State<LoginScreen> {
           listen: false,
         );
         settingsProv.setUserData(
-          name: data['name'] ?? '',
-          email: data['email'] ?? '',
-          company: data['company'] ?? '',
+          name: (data['name'] ?? '').toString(),
+          email: (data['email'] ?? '').toString(),
+          company: (data['company'] ?? '').toString(),
         );
       }
     } catch (_) {}
@@ -51,11 +51,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loginWithGoogle() async {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn();
-      await googleSignIn.signOut();
+      await googleSignIn.signOut(); // Forzar selector de cuenta
 
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) return;
 
+      // ✅ Primero autenticarse con Firebase Auth
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
@@ -68,26 +69,46 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       final user = userCredential.user;
 
-      if (user != null) {
-        final userDoc = FirebaseFirestore.instance
-            .collection('usuarios')
-            .doc(user.uid);
-        final exists = await userDoc.get();
-
-        if (!exists.exists) {
-          await userDoc.set({
-            'name': user.displayName ?? '',
-            'email': user.email,
-            'company': '',
-            'profesion': '',
-            'ubicacion': '',
-          });
-        }
-
-        await _loadUserDataIntoProvider(user.uid);
-        if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/main_menu');
+      if (user == null) {
+        _showAlert(
+          icon: Icons.error_outline,
+          color: Colors.red,
+          title: 'Error de autenticación',
+          message: 'No se pudo autenticar con Google. Inténtalo de nuevo.',
+        );
+        return;
       }
+
+      final String email = user.email ?? '';
+
+      // 🔍 Ahora que ya está autenticado, puedes consultar Firestore sin error
+      final query =
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .where('email', isEqualTo: email)
+              .limit(1)
+              .get();
+      print('Email buscado: $email');
+      print('Documentos encontrados: ${query.docs.length}');
+
+      if (query.docs.isEmpty) {
+        // Crear nuevo usuario en Firestore si no existe
+        await FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(user.uid)
+            .set({
+              'name': user.displayName ?? '',
+              'email': user.email,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+      }
+
+      // ✅ Cargar datos del usuario al Provider
+      await _loadUserDataIntoProvider(user.uid);
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, '/main_menu');
+      });
     } catch (e) {
       _showAlert(
         icon: Icons.error_outline,
@@ -101,34 +122,57 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loginWithFacebook() async {
     try {
       final result = await FacebookAuth.instance.login();
+
       if (result.status == LoginStatus.success && result.accessToken != null) {
+        final userData = await FacebookAuth.instance.getUserData();
+        final email = userData['email'];
+
+        if (email == null || email.isEmpty) {
+          _showAlert(
+            icon: Icons.warning,
+            color: Colors.orange,
+            title: 'Correo no disponible',
+            message:
+                'No pudimos acceder al correo de tu cuenta de Facebook. Por favor, asegúrate de que tu cuenta tiene un correo válido o usa otro método para iniciar sesión.',
+          );
+          return;
+        }
+
+        // 🔍 Verificar en Firestore si ese correo ya está registrado
+        final query =
+            await FirebaseFirestore.instance
+                .collection('usuarios')
+                .where('email', isEqualTo: email)
+                .limit(1)
+                .get();
+
+        if (query.docs.isEmpty) {
+          _showAlert(
+            icon: Icons.lock_outline,
+            color: Colors.orange,
+            title: 'Acceso restringido',
+            message:
+                'Este correo no está registrado. Por favor regístrate primero antes de usar Facebook.',
+          );
+          return;
+        }
+
+        // ✅ Autenticarse con Firebase usando el token de Facebook
         final credential = FacebookAuthProvider.credential(
           result.accessToken!.tokenString,
         );
         final userCredential = await FirebaseAuth.instance.signInWithCredential(
           credential,
         );
+
         final user = userCredential.user;
 
         if (user != null) {
-          final userDoc = FirebaseFirestore.instance
-              .collection('usuarios')
-              .doc(user.uid);
-          final exists = await userDoc.get();
-
-          if (!exists.exists) {
-            await userDoc.set({
-              'name': user.displayName ?? '',
-              'email': user.email,
-              'company': '',
-              'profesion': 'Facebook',
-              'ubicacion': '',
-            });
-          }
-
           await _loadUserDataIntoProvider(user.uid);
           if (!mounted) return;
-          Navigator.pushReplacementNamed(context, '/main_menu');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushReplacementNamed(context, '/main_menu');
+          });
         }
       } else {
         _showAlert(
@@ -201,7 +245,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
         await _loadUserDataIntoProvider(firebaseUser.uid);
         if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/main_menu');
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushReplacementNamed(context, '/main_menu');
+        });
       }
     } catch (e) {
       _showAlert(
@@ -287,46 +334,75 @@ class _LoginScreenState extends State<LoginScreen> {
                 // EMAIL
                 TextField(
                   controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(fontSize: 16),
                   decoration: InputDecoration(
-                    labelText: 'Email',
-                    labelStyle: const TextStyle(color: Colors.grey),
+                    prefixIcon: const Icon(
+                      Icons.email_outlined,
+                      color: Colors.blue,
+                    ),
+                    labelText: 'Correo electrónico',
+                    labelStyle: const TextStyle(color: Colors.blueGrey),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.95),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 18,
+                      horizontal: 16,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Colors.grey),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: const BorderSide(
                         color: Colors.blue,
                         width: 2,
                       ),
                     ),
+                    hintText: 'ejemplo@correo.com',
+                    hintStyle: const TextStyle(color: Colors.grey),
+                    floatingLabelBehavior: FloatingLabelBehavior.auto,
                   ),
                 ),
-                const SizedBox(height: 10),
+
+                const SizedBox(height: 16),
 
                 // CONTRASEÑA
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
+                  style: const TextStyle(fontSize: 16),
                   decoration: InputDecoration(
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      color: Colors.blue,
+                    ),
                     labelText: 'Contraseña',
-                    labelStyle: const TextStyle(color: Colors.grey),
+                    labelStyle: const TextStyle(color: Colors.blueGrey),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.95),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 18,
+                      horizontal: 16,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Colors.grey),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: const BorderSide(
                         color: Colors.blue,
                         width: 2,
                       ),
                     ),
+                    hintText: 'Mínimo 6 caracteres',
+                    hintStyle: const TextStyle(color: Colors.grey),
+                    floatingLabelBehavior: FloatingLabelBehavior.auto,
                   ),
                 ),
+
                 const SizedBox(height: 10),
 
                 // ENLACES

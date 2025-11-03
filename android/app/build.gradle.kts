@@ -7,8 +7,9 @@ plugins {
     id("kotlin-android")
     id("com.google.gms.google-services")
     id("dev.flutter.flutter-gradle-plugin")
-    
 }
+
+
 
 android {
     namespace   = "com.app.boviframe"

@@ -15,7 +15,7 @@ class PdfService {
     Uint8List? barImage,
   }) async {
     // Autenticación anónima
-    final comentarios = (data['comentarios']?.toString() ?? '').trim();
+    final comentarios = (data['comentario']?.toString() ?? '').trim();
 
     // 1) Datos básicos
     final numero = data['numero']?.toString() ?? '';
@@ -330,10 +330,13 @@ class PdfService {
               ),
               pw.SizedBox(height: 6),
               comentarios.isNotEmpty
-                  ? pw.Text(comentarios, style: pw.TextStyle(fontSize: 10))
+                  ? pw.Text(
+                    comentarios,
+                    style: pw.TextStyle(fontSize: 13, lineSpacing: 4),
+                  )
                   : pw.Text(
                     'Sin comentarios.',
-                    style: pw.TextStyle(fontSize: 10, color: PdfColors.grey),
+                    style: pw.TextStyle(fontSize: 12, color: PdfColors.grey),
                   ),
 
               // Evaluador + firma

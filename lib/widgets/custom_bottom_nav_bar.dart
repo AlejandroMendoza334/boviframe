@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class CustomBottomNavBar extends StatelessWidget {
   final int currentIndex;
 
-  const CustomBottomNavBar({required this.currentIndex});
+  const CustomBottomNavBar({super.key, required this.currentIndex});
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +27,9 @@ class CustomBottomNavBar extends StatelessWidget {
             Navigator.pushNamed(context, '/index');
             break;
           case 4:
+            Navigator.pushNamed(context, '/stats'); 
+            break;
+          case 5:
             Navigator.pushNamed(context, '/settings');
             break;
         }
@@ -36,6 +39,10 @@ class CustomBottomNavBar extends StatelessWidget {
         BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Buscar'),
         BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'EPMURAS'),
         BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Índices'),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.insights),
+          label: 'Estadísticas',
+        ), // nuevo
         BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Más'),
       ],
     );

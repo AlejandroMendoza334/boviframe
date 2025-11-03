@@ -25,7 +25,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     'Agrónomo',
     'Otro',
   ];
-  String _selectedProfession = 'Veterinario';
+  String? _selectedProfession;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -79,8 +79,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 ],
               ),
               content: const Text(
-                'Te enviamos un enlace de verificación a tu correo. Haz clic en él para activar tu cuenta.',
-                style: TextStyle(fontSize: 16),
+                'Te enviamos un enlace de verificación a tu correo. Haz clic en él para activar tu cuenta. Si no lo ves, revisa también tu carpeta de spam o correo no deseado.',
               ),
               actions: [
                 TextButton.icon(
@@ -114,7 +113,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       email: _emailCtrl.text.trim(),
       password: _passwordCtrl.text,
       nombre: _nombreCtrl.text.trim(),
-      profesion: _selectedProfession,
+      profesion: _selectedProfession!,
       ubicacion: _ubicacionCtrl.text.trim(),
     );
 
@@ -215,11 +214,15 @@ class _RegisterScreenState extends State<RegisterScreen>
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFE3F2FD), Color(0xFFFFFFFF)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFEDF6FF), // celeste clarito
+              Color(0xFFFFFFFF),
+            ],
           ),
         ),
+
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -321,22 +324,33 @@ class _RegisterScreenState extends State<RegisterScreen>
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
                           value: _selectedProfession,
-                          items:
-                              _professions
-                                  .map(
-                                    (p) => DropdownMenuItem(
-                                      value: p,
-                                      child: Text(p),
-                                    ),
-                                  )
-                                  .toList(),
-                          onChanged:
-                              (v) => setState(() => _selectedProfession = v!),
                           decoration: _inputDecoration(
                             'Profesión',
                             Icons.work_outline,
                           ),
+                          isExpanded: true,
+                          hint: const Text('Selecciona una profesión'),
+
+                          items:
+                              _professions.map((String prof) {
+                                return DropdownMenuItem<String>(
+                                  value: prof,
+                                  child: Text(prof),
+                                );
+                              }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedProfession = newValue!;
+                            });
+                          },
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Por favor selecciona una profesión';
+                            }
+                            return null;
+                          },
                         ),
+
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _ubicacionCtrl,
@@ -418,17 +432,23 @@ class _RegisterScreenState extends State<RegisterScreen>
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon),
+      prefixIcon: Icon(icon, color: Colors.blueAccent),
+      labelStyle: const TextStyle(
+        color: Colors.blueGrey,
+        fontWeight: FontWeight.w500,
+      ),
       filled: true,
-      fillColor: Colors.grey.shade100,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(color: Colors.grey.shade300),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.blue, width: 2),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
       ),
+      hintStyle: TextStyle(color: Colors.grey.shade400),
     );
   }
 }

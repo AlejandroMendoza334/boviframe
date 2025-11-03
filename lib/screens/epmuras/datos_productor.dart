@@ -59,7 +59,7 @@ class _DatosProductorScreenState extends State<DatosProductorScreen> {
           .collection('sesiones')
           .doc(widget.sessionId)
           .collection('datos_productor')
-          .doc('info')
+          .doc('info del productor')
           .set(produtorMap);
 
       // 4) Navegar a la pantalla de Evaluación Animal

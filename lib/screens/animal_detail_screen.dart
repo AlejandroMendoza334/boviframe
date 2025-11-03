@@ -91,21 +91,32 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
             .collection('evaluaciones_animales')
             .get();
 
+    // Mapea etiqueta → nombre de campo real
+    final fieldNames = {
+      'Nac.': 'peso_nac',
+      'Dest.': 'peso_dest',
+      'Ajus.': 'peso_ajus',
+    };
+
+    // Inicializa sumas
     final sumsE = {for (var k in epmuras.keys) k: 0.0};
-    final sumsP = {for (var k in pesos.keys) k: 0.0};
+    final sumsP = {for (var k in fieldNames.keys) k: 0.0};
 
     for (var d in docs.docs) {
       final m = d.data();
+      // Sumo EPMURAS igual que antes…
       final raw = (m['epmuras'] as Map<String, dynamic>?) ?? {};
       sumsE.forEach((k, _) {
         sumsE[k] =
             sumsE[k]! + (double.tryParse(raw[k]?.toString() ?? '0') ?? 0.0);
       });
-      sumsP.forEach((k, _) {
-        sumsP[k] =
-            sumsP[k]! +
-            (double.tryParse(m['peso_${k.toLowerCase()}']?.toString() ?? '0') ??
-                0.0);
+
+      // Sumo pesos usando el mapeo correcto
+      sumsP.forEach((label, _) {
+        final field = fieldNames[label]!;
+        sumsP[label] =
+            sumsP[label]! +
+            (double.tryParse(m[field]?.toString() ?? '0') ?? 0.0);
       });
     }
 
@@ -149,8 +160,14 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
     final radarImg = await _capture(_radarKey);
     final barImg = await _capture(_barKey);
 
+    // Fusiona el comentario del campo en el mapa que envías al PDF
+    final fullData = {
+      ...widget.animalData,
+      'comentario': widget.animalData['comentario']?.toString().trim() ?? '',
+    };
+
     return PdfService.generateAnimalPdfBytes(
-      data: widget.animalData,
+      data: fullData,
       animalImage: animalImg.isNotEmpty ? animalImg : null,
       radarImage: radarImg.isNotEmpty ? radarImg : null,
       barImage: barImg.isNotEmpty ? barImg : null,
@@ -187,7 +204,59 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
             (_) => Scaffold(
               appBar: AppBar(
                 title: const Text('Vista previa PDF'),
-                leading: BackButton(),
+                iconTheme: const IconThemeData(color: Colors.white),
+                titleTextStyle: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                ),
+                backgroundColor: Colors.blue[800],
+                leading: const BackButton(),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.picture_as_pdf),
+                    tooltip: 'Descargar PDF',
+                    onPressed: () async {
+                      // Genera y comparte/descarga
+                      final bytes = await _generatePdfBytes();
+                      await Printing.sharePdf(
+                        bytes: bytes,
+                        filename:
+                            'evaluacion_${widget.animalData['numero']}.pdf',
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.zoom_in),
+                    tooltip: 'Zoom gráficos',
+                    onPressed: () async {
+                      // Captura las imágenes de los gráficos
+                      final radarImg = await _capture(_radarKey);
+                      final barImg = await _capture(_barKey);
+                      // Muestra diálogo zoomable
+                      showDialog(
+                        context: context,
+                        builder:
+                            (_) => Dialog(
+                              child: InteractiveViewer(
+                                panEnabled: true,
+                                minScale: 1,
+                                maxScale: 4,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (radarImg.isNotEmpty)
+                                      Image.memory(radarImg),
+                                    const SizedBox(height: 12),
+                                    if (barImg.isNotEmpty) Image.memory(barImg),
+                                  ],
+                                ),
+                              ),
+                            ),
+                      );
+                    },
+                  ),
+                ],
               ),
               body: PdfPreview(
                 allowPrinting: true,
@@ -286,6 +355,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
               onPressed: _onPreviewPressed,
               icon: const Icon(Icons.visibility),
               label: const Text('Vista previa PDF'),
+
               style: ElevatedButton.styleFrom(
                 backgroundColor: const ui.Color.fromARGB(255, 125, 208, 233),
                 padding: const EdgeInsets.symmetric(
@@ -302,7 +372,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
               icon: const Icon(Icons.picture_as_pdf),
               label: const Text('Descargar PDF'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
+                backgroundColor: const ui.Color.fromARGB(255, 51, 206, 190),
                 padding: const EdgeInsets.symmetric(
                   vertical: 12,
                   horizontal: 16,
@@ -359,18 +429,19 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
         isPeso
             ? ['Nac.', 'Dest.', 'Ajus.']
             : ['E', 'P', 'M', 'U', 'R', 'A', 'S'];
+
     final maxVal =
         isPeso
             ? ([
                   ...labels.map((k) => data[k] ?? 0.0),
                   ...labels.map((k) => avg[k] ?? 0.0),
                 ].reduce((a, b) => a > b ? a : b) *
-                1.2)
-            : null;
+                1.3)
+            : 6.0;
 
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 5,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -378,16 +449,19 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
             Text(
               title,
               style: const TextStyle(
-                fontSize: 20,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Colors.blueGrey,
+                color: Colors.teal,
+                letterSpacing: 1.2,
               ),
             ),
-            const Divider(height: 24),
+            const Divider(height: 24, thickness: 1),
             SizedBox(
-              height: 200,
+              height: 250,
               child: RadarChart(
                 RadarChartData(
+                  radarShape: RadarShape.polygon,
+                  tickCount: 5,
                   dataSets: [
                     RadarDataSet(
                       dataEntries:
@@ -395,6 +469,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                               .map((k) => RadarEntry(value: data[k]!))
                               .toList(),
                       borderColor: Colors.blue,
+                      borderWidth: 2,
                       fillColor: Colors.blue.withOpacity(0.3),
                       entryRadius: 3,
                     ),
@@ -404,37 +479,34 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                               .map((k) => RadarEntry(value: avg[k] ?? 0.0))
                               .toList(),
                       borderColor: Colors.orange,
+                      borderWidth: 2,
                       fillColor: Colors.orange.withOpacity(0.3),
                       entryRadius: 3,
                     ),
                   ],
-                  radarBackgroundColor: Colors.transparent,
-                  radarBorderData: const BorderSide(color: Colors.grey),
                   getTitle:
-                      (i, angle) =>
-                          RadarChartTitle(text: labels[i], angle: angle),
-                  titleTextStyle: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black87,
-                  ),
-                  tickCount: 5,
+                      (index, angle) =>
+                          RadarChartTitle(text: labels[index], angle: angle),
                   ticksTextStyle: const TextStyle(
-                    fontSize: 8,
+                    fontSize: 10,
+                    color: Colors.black54,
+                  ),
+                  radarBorderData: const BorderSide(
                     color: Colors.grey,
+                    width: 1,
                   ),
                   gridBorderData: const BorderSide(
                     color: Colors.grey,
                     width: 1,
                   ),
-                  tickBorderData: const BorderSide(
-                    color: Colors.grey,
-                    width: 1,
+                  tickBorderData: BorderSide(
+                    color: Colors.grey.withOpacity(0.4),
                   ),
                   borderData: FlBorderData(show: false),
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:boviframe/widgets/custom_bottom_nav_bar.dart';
 
 class EpmurasScreen extends StatelessWidget {
   const EpmurasScreen({Key? key}) : super(key: key);
@@ -33,8 +34,9 @@ class EpmurasScreen extends StatelessWidget {
                 if (currentUser == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content:
-                          Text('Debes iniciar sesión para crear una sesión.'),
+                      content: Text(
+                        'Debes iniciar sesión para crear una sesión.',
+                      ),
                       backgroundColor: Colors.redAccent,
                     ),
                   );
@@ -42,23 +44,24 @@ class EpmurasScreen extends StatelessWidget {
                 }
 
                 try {
-                  final existingSessionsSnapshot = await FirebaseFirestore
-                      .instance
-                      .collection('sesiones')
-                      .where('userId', isEqualTo: currentUser.uid)
-                      .get();
+                  final existingSessionsSnapshot =
+                      await FirebaseFirestore.instance
+                          .collection('sesiones')
+                          .where('userId', isEqualTo: currentUser.uid)
+                          .get();
 
-                  final nextSessionNumber = existingSessionsSnapshot.docs.length + 1;
+                  final nextSessionNumber =
+                      existingSessionsSnapshot.docs.length + 1;
 
                   final docRef = await FirebaseFirestore.instance
                       .collection('sesiones')
                       .add({
-                    'fecha_creacion': FieldValue.serverTimestamp(),
-                    'estado': 'activa',
-                    'userId': currentUser.uid,
-                    'numero_sesion': 'Sesión $nextSessionNumber',
-                    'numero_sesion_int': nextSessionNumber,
-                  });
+                        'fecha_creacion': FieldValue.serverTimestamp(),
+                        'estado': 'activa',
+                        'userId': currentUser.uid,
+                        'numero_sesion': 'Sesión $nextSessionNumber',
+                        'numero_sesion_int': nextSessionNumber,
+                      });
 
                   final sessionId = docRef.id;
 
@@ -67,7 +70,7 @@ class EpmurasScreen extends StatelessWidget {
                     '/new_session',
                     arguments: {
                       'sessionId': sessionId,
-                      'numeroSesion': 'Sesión $nextSessionNumber',
+                      'numeroSesion': nextSessionNumber,
                     },
                   );
                 } catch (e) {
@@ -111,39 +114,7 @@ class EpmurasScreen extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 2,
-        selectedItemColor: Colors.purple,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Menu'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Buscar'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.analytics), label: 'EPMURAS'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart), label: 'Índices'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Más'),
-        ],
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              Navigator.pushReplacementNamed(context, '/main');
-              break;
-            case 1:
-              Navigator.pushReplacementNamed(context, '/consulta');
-              break;
-            case 2:
-              break;
-            case 3:
-              Navigator.pushReplacementNamed(context, '/index');
-              break;
-            case 4:
-              Navigator.pushReplacementNamed(context, '/settings');
-              break;
-          }
-        },
-      ),
+      bottomNavigationBar: CustomBottomNavBar(currentIndex: 2),
     );
   }
 }

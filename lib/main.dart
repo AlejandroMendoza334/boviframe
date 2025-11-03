@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import '../firebase_options.dart';
 import '../models/evaluacion_model.dart';
-import '../services/database_service.dart';
 import '../screens/splash_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/register_screen.dart';
 import '../screens/forgot_password_screen.dart';
 import '../screens/main_menu.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../screens/settings_screen.dart';
 import '../screens/epmuras/datos_productor.dart';
@@ -32,6 +29,7 @@ import '../screens/epmuras/edit_session_screen.dart';
 import '../screens/epmuras/edit_producer.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/indice_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import '../screens/epmuras/edit_session_selector.dart';
 import '../screens/animal_detail_screen.dart';
 import '../screens/providers/user_provider.dart';
@@ -40,27 +38,21 @@ import '../screens/new_public_screen.dart';
 import '../screens/new_detail_screen.dart';
 import '../screens/new_admin_create_screen.dart';
 import '../screens/new_admin_screen.dart';
-import '../screens/new_edit_screen.dart';
 import '../screens/bases_teoricas.dart';
-import '../screens/sesiones_screen.dart';
-import '../screens/new_admin_screen.dart';
+import '../services/connectivity_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  print('Mensaje recibido en segundo plano: ${message.notification?.title}');
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   await Hive.initFlutter();
   Hive.registerAdapter(EvaluacionAnimalAdapter());
   tz.initializeTimeZones();
+
+  // Iniciar escucha de conectividad para sincronización offline
+  iniciarEscuchaInternet();
 
   runApp(
     MultiProvider(
@@ -103,12 +95,21 @@ class MyApp extends StatelessWidget {
           title: 'BOVIFrame',
           debugShowCheckedModeBanner: false,
           theme: ThemeData.light(),
+          locale: const Locale('es', ''), // ⬅️ Español
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('es', ''), // ⬅️ Español
+          ],
           routes: {
             '/login': (_) => LoginScreen(),
             '/register': (_) => RegisterScreen(),
             '/forgot_password': (_) => ForgotPasswordScreen(),
             '/main': (_) => MainMenu(),
-            '/news_public': (_) => NewsPublicScreen(),
+            '/news_public': (_) => const NewsPublicScreen(),
             '/news_create': (_) => NewsAdminCreateScreen(),
             '/news_admin': (_) => NewsAdminScreen(),
             '/main_menu': (_) => MainMenu(),
@@ -121,7 +122,7 @@ class MyApp extends StatelessWidget {
             '/consulta_animal': (_) => ConsultaAnimalScreen(),
             '/consulta_finca': (_) => ConsultaFincaScreen(),
             '/animal_evaluation': (_) => AnimalEvaluationScreen(),
-            '/theory': (_) => EpmurasInfographicWidget(),
+            '/theory': (_) => const EpmurasInfographic(),
             '/editar_finca': (_) => EditarFincaScreen(),
             '/edit_session_selector': (_) => EditSessionSelectorScreen(),
             '/edit_producer': (context) {
@@ -150,10 +151,11 @@ class MyApp extends StatelessWidget {
                 return MaterialPageRoute(
                   builder:
                       (_) => NewSessionScreen(
-                        sessionId:
-                            args != null ? args['sessionId'] as String? : null,
+                        sessionId: args?['sessionId'],
+                        numeroSesion: args?['numeroSesion'],
                       ),
                 );
+
               case '/datos_productor':
                 final args = settings.arguments as Map<String, dynamic>;
                 return MaterialPageRoute(

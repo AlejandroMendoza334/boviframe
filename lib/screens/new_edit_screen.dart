@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 import 'package:intl/intl.dart';
 
@@ -44,15 +43,12 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
   ];
   String _selectedCategory = 'Educación';
 
-  @override
-  void initState() {
-    super.initState();
-    _loadExistingData();
-    controller =
-        WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..loadRequest(Uri.parse('https://flutter.dev'));
-  }
+ @override
+void initState() {
+  super.initState();
+  _loadExistingData();
+}
+
 
   Future<void> _loadExistingData() async {
     try {
@@ -77,16 +73,6 @@ class _NewsEditScreenState extends State<NewsEditScreen> {
     }
   }
 
-  Future<void> loadWebPage(String rawUrl) async {
-    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
-      rawUrl = 'https://$rawUrl';
-    }
-    final uri = Uri.parse(rawUrl);
-
-    await controller.loadRequest(uri);
-  }
-
-  late WebViewController controller;
 
   Future<void> _saveChanges() async {
     final title = _titleController.text.trim();

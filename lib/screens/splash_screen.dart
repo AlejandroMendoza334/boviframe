@@ -11,51 +11,52 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+  late final AnimationController _controller;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
 
+    // 1) Configuro el controller y las animaciones
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     );
+    _fadeAnimation =
+        CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _scaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
 
-    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-
-    _scaleAnimation = Tween<double>(
-      begin: 0.7,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
-
+    // 2) Arranco la animación
     _controller.forward();
 
-    _initializeApp();
-
-    Future.delayed(const Duration(milliseconds: 3500), () {
-      final user = FirebaseAuth.instance.currentUser;
-      final route = user != null ? '/main_menu' : '/login';
-      Navigator.pushReplacementNamed(context, route);
+    // 3) Después del primer frame, inicio la suscripción y la navegación
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeApp();
     });
   }
 
   Future<void> _initializeApp() async {
+    // Suscribirse al topic "noticias"
     try {
-      // Suscribirse al topic "news"
       await FirebaseMessaging.instance.subscribeToTopic("noticias");
     } catch (e) {
-      print("Error al suscribirse al topic: $e");
+      debugPrint("Error al suscribirse al topic: $e");
     }
 
-    await Future.delayed(const Duration(milliseconds: 3500));
+    // Espero unos segundos para mostrar el logo
+    await Future.delayed(const Duration(seconds: 3));
 
+    // Compruebo si hay un usuario logueado
     final user = FirebaseAuth.instance.currentUser;
-    final route = user != null ? '/main_menu' : '/login';
+    final nextRoute = user != null ? '/main_menu' : '/login';
+
+    // Navego UNA SOLA VEZ
     if (mounted) {
-      Navigator.pushReplacementNamed(context, route);
+      Navigator.of(context).pushReplacementNamed(nextRoute);
     }
   }
 
@@ -85,7 +86,10 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
             const SizedBox(height: 40),
-            const CircularProgressIndicator(color: Colors.blue, strokeWidth: 3),
+            const CircularProgressIndicator(
+              color: Colors.blue,
+              strokeWidth: 3,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Iniciando BOVIFrame...',

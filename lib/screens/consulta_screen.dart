@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'consulta_animal_screen.dart';
 import 'consulta_finca_screen.dart';
+import '../widgets/custom_bottom_nav_bar.dart';
 
 class ConsultaScreen extends StatefulWidget {
   const ConsultaScreen({Key? key}) : super(key: key);
@@ -105,35 +106,7 @@ class _ConsultaScreenState extends State<ConsultaScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.purple,
-        unselectedItemColor: Colors.grey[600],
-        onTap: _onTapNav,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            label: 'Menú',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search_outlined),
-            label: 'Buscar',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_outlined),
-            label: 'EPMURAS',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.insert_chart_outlined),
-            label: 'Índices',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            label: 'Más',
-          ),
-        ],
-      ),
+      bottomNavigationBar: CustomBottomNavBar(currentIndex: 1),
     );
   }
 }

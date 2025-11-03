@@ -5,9 +5,10 @@ import '../../widgets/custom_app_scaffold.dart';
 
 class NewSessionScreen extends StatefulWidget {
   final String? sessionId;
+  final dynamic numeroSesion;
 
-  const NewSessionScreen({Key? key, required this.sessionId}) : super(key: key);
-
+  const NewSessionScreen({Key? key, this.sessionId, this.numeroSesion})
+    : super(key: key);
   @override
   State<NewSessionScreen> createState() => _NewSessionScreenState();
 }
@@ -23,10 +24,11 @@ class _NewSessionScreenState extends State<NewSessionScreen> {
 
   Future<int> _generarNumeroSesion() async {
     final userId = FirebaseAuth.instance.currentUser!.uid;
-    final snapshot = await FirebaseFirestore.instance
-        .collection('sesiones')
-        .where('userId', isEqualTo: userId)
-        .get();
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('sesiones')
+            .where('userId', isEqualTo: userId)
+            .get();
     return snapshot.docs.length + 1;
   }
 
@@ -53,28 +55,30 @@ class _NewSessionScreenState extends State<NewSessionScreen> {
                 _buildSectionButton(
                   context,
                   label: 'Datos del Productor',
-                  onTap: () => Navigator.pushNamed(
-                    context,
-                    '/datos_productor',
-                    arguments: {
-                      'sessionId': widget.sessionId,
-                      'numeroSesion': numeroSesion
-                    },
-                  ),
+                  onTap:
+                      () => Navigator.pushNamed(
+                        context,
+                        '/datos_productor',
+                        arguments: {
+                          'sessionId': widget.sessionId,
+                          'numeroSesion': numeroSesion,
+                        },
+                      ),
                   highlighted: true,
                 ),
                 const SizedBox(height: 16),
                 _buildSectionButton(
                   context,
                   label: 'Evaluación del Animal',
-                  onTap: () => Navigator.pushNamed(
-                    context,
-                    '/animal_evaluation',
-                    arguments: {
-                      'sessionId': widget.sessionId,
-                      'numeroSesion': numeroSesion
-                    },
-                  ),
+                  onTap:
+                      () => Navigator.pushNamed(
+                        context,
+                        '/animal_evaluation',
+                        arguments: {
+                          'sessionId': widget.sessionId,
+                          'numeroSesion': numeroSesion,
+                        },
+                      ),
                 ),
               ],
             ),
@@ -105,8 +109,7 @@ class _NewSessionScreenState extends State<NewSessionScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle:
-              const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         child: Text(label),
       ),

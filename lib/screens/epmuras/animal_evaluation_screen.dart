@@ -4,6 +4,7 @@ import 'package:flutter/services.dart'; // Para rootBundle.load()
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:flutter/rendering.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -22,6 +23,8 @@ import '../../services/pdf_service.dart';
 import '../providers/session_provider.dart';
 import '../providers/settings_provider.dart';
 import '../../widgets/custom_app_scaffold.dart';
+import '../../services/offline_session_service.dart';
+import '../../services/connectivity_service.dart';
 
 class AnimalEvaluationScreen extends StatefulWidget {
   final String? docId;
@@ -55,21 +58,39 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
   final _edadDiasController = TextEditingController();
   final _fechaNacController = TextEditingController();
   final _fechaDestController = TextEditingController();
-  Future<void> _selectDate(BuildContext ctx, TextEditingController ctrl) async {
-    DateTime init = DateTime.now();
-    try {
-      init = DateTime.parse(ctrl.text);
-    } catch (_) {}
-    final picked = await showDatePicker(
-      context: ctx,
-      initialDate: init,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+  final _comentarioController = TextEditingController();
+
+  Future<void> _selectDate(
+    BuildContext context,
+    TextEditingController controller,
+  ) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      locale: const Locale('es', ''),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.blue.shade800, // Color del header y botón OK
+              onPrimary: Colors.white, // Texto en header
+              onSurface: Colors.black, // Texto general
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.blue.shade800, // Botón CANCELAR
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
+
     if (picked != null) {
-      ctrl.text = picked.toIso8601String().split('T').first;
-      _markChanged();
-      _calcularPesoAjustado();
+      controller.text = '${picked.day}/${picked.month}/${picked.year}';
     }
   }
 
@@ -202,6 +223,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
     _pesoNacController.dispose();
     _pesoDestController.dispose();
     _pesoAjusController.dispose();
+    _comentarioController.dispose();
     _edadDiasController.dispose();
     _fechaNacController.dispose();
     _fechaDestController.dispose();
@@ -213,6 +235,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
   }
 
   void _resetForm() {
+    _comentarioController.clear();
     _numeroController.clear();
     _registroController.clear();
     _pesoNacController.clear();
@@ -232,33 +255,30 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
   }
 
   void _calcularPesoAjustado() {
-    if (_pesoNacController.text.isEmpty ||
-        _pesoDestController.text.isEmpty ||
-        _fechaNacController.text.isEmpty ||
-        _fechaDestController.text.isEmpty)
-      return;
-
     final nac = double.tryParse(_pesoNacController.text);
     final dest = double.tryParse(_pesoDestController.text);
+    if (nac == null || dest == null) return;
+
+    // Usa DateFormat:
+    final df = DateFormat('d/M/y');
     DateTime fn, fd;
     try {
-      fn = DateTime.parse(_fechaNacController.text);
-      fd = DateTime.parse(_fechaDestController.text);
+      fn = df.parse(_fechaNacController.text);
+      fd = df.parse(_fechaDestController.text);
     } catch (_) {
-      return;
+      return; // formato inválido
     }
 
     final dias = fd.difference(fn).inDays;
-    if (nac == null || dest == null || dias <= 0) return;
+    if (dias <= 0) return;
 
-    // Fórmula original que daba ~250 kg:
     final ajus = (((dest - nac) / dias) * 205) + nac;
-
-    _pesoAjusController.text = ajus.toStringAsFixed(
-      0,
-    ); // redondeo sin decimales
-    _edadDiasController.text = dias.toString();
-    _markChanged();
+    // Actualiza los controllers dentro de setState para que todo se redibuje:
+    setState(() {
+      _pesoAjusController.text = ajus.toStringAsFixed(0);
+      _edadDiasController.text = dias.toString();
+      _hasChanged = true;
+    });
   }
 
   Future<void> _pickImage() async {
@@ -445,6 +465,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
       'peso_dest': _pesoDestController.text,
       'peso_ajus': _pesoAjusController.text,
       'edad_dias': _edadDiasController.text,
+      'comentario': _comentarioController.text,
       'epmuras': sessionProv.epmuras,
       'image_base64':
           sessionProv.imageBytes != null
@@ -456,6 +477,42 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
     };
 
     try {
+      // Verificar conexión a internet
+      final hasInternet = await ConnectivityService.hasRealInternetConnection();
+      
+      if (!hasInternet) {
+        // Sin internet: guardar offline
+        try {
+          final offlineId = await OfflineSessionService.saveEvaluationOffline(
+            evaluationData: data,
+            sessionId: _sessionId ?? '',
+          );
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('📱 Guardado offline. Se sincronizará cuando haya internet.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          _hasChanged = false;
+          return offlineId;
+        } catch (offlineError) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('❌ Error al guardar offline: $offlineError'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return null;
+        }
+      }
+
+      // Hay internet: intentar guardar en Firestore
       if (widget.isEditing && widget.docId != null) {
         // MODO EDICIÓN
         await FirebaseFirestore.instance
@@ -476,23 +533,47 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
         return widget.docId;
       } else {
         // MODO NUEVO
-        final docRef = await FirebaseFirestore.instance
-            .collection('sesiones')
-            .doc(_sessionId)
-            .collection('evaluaciones_animales')
-            .add(data);
+        try {
+          final docRef = await FirebaseFirestore.instance
+              .collection('sesiones')
+              .doc(_sessionId)
+              .collection('evaluaciones_animales')
+              .add(data);
 
-        _lastEvaluationId = docRef.id;
-        _hasChanged = false;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Evaluación guardada correctamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _lastEvaluationId = docRef.id;
+          _hasChanged = false;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ Evaluación guardada correctamente'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+          return docRef.id;
+        } on FirebaseException catch (e) {
+          // Si Firestore falla, guardar offline como respaldo
+          debugPrint('⚠️ Error de Firestore, guardando offline: ${e.code}');
+          try {
+            final offlineId = await OfflineSessionService.saveEvaluationOffline(
+              evaluationData: data,
+              sessionId: _sessionId,
+            );
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('📱 Guardado offline. Se sincronizará cuando sea posible.'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+            _hasChanged = false;
+            return offlineId;
+          } catch (offlineError) {
+            rethrow;
+          }
         }
-        return docRef.id;
       }
     } catch (e) {
       if (mounted) {
@@ -503,7 +584,24 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
           ),
         );
       }
-      return null;
+      // Como último recurso, intentar guardar offline
+      try {
+        await OfflineSessionService.saveEvaluationOffline(
+          evaluationData: data,
+          sessionId: _sessionId,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📱 Guardado offline como respaldo.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return DateTime.now().millisecondsSinceEpoch.toString();
+      } catch (_) {
+        return null;
+      }
     }
   }
 
@@ -647,48 +745,95 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
     return resultado.isEmpty ? '[No hay cambios detectados]' : resultado;
   }
 
-  /// Muestra un diálogo de confirmación antes de guardar o actualizar.
-  /// Indica también que se redirigirá a la pestaña de "Nueva Sesión".
   Future<void> _confirmGuardar() async {
     final resumen = _buildResumenCambios();
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(
-            widget.isEditing ? 'Confirmar Actualización' : 'Confirmar Guardar',
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+          contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+          backgroundColor: Colors.white,
+          title: Row(
+            children: [
+              Icon(
+                widget.isEditing ? Icons.edit_note : Icons.save_alt,
+                color: widget.isEditing ? Colors.orange : Colors.blue,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  widget.isEditing
+                      ? 'Confirmar actualización'
+                      : 'Confirmar guardado',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              ),
+            ],
           ),
           content: SingleChildScrollView(
+            // ✅ Agregado para scroll completo
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   widget.isEditing
-                      ? 'Vas a actualizar esta evaluación con los siguientes cambios:'
-                      : 'Vas a guardar la siguiente información:\n\n(Al confirmar, serás redirigido a la pestaña de Nueva Sesión)',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                      ? 'Estás a punto de actualizar esta evaluación con los siguientes cambios:'
+                      : 'Estás a punto de guardar la siguiente información.\n\n📌 Al confirmar, serás redirigido a la pestaña "Nueva Sesión".',
+                  style: const TextStyle(fontSize: 15),
                 ),
                 const SizedBox(height: 12),
                 Container(
+                  constraints: const BoxConstraints(
+                    maxHeight: 250,
+                  ), // ✅ Límite de altura
+                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
-                  padding: const EdgeInsets.all(8),
-                  child: Text(resumen, style: const TextStyle(fontSize: 13)),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      resumen,
+                      style: const TextStyle(fontSize: 13, height: 1.4),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
+          actionsPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
           actions: [
             TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('Cancelar'),
             ),
-            ElevatedButton(
+            ElevatedButton.icon(
+              icon: Icon(widget.isEditing ? Icons.check : Icons.save),
+              label: Text(widget.isEditing ? 'Actualizar' : 'Guardar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: widget.isEditing ? Colors.orange : Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text(widget.isEditing ? 'Actualizar' : 'Guardar'),
             ),
           ],
         );
@@ -1449,15 +1594,19 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
               ),
 
               // ─── Fecha Nacimiento / Fecha Destete ───
+              // ── Fechas: Nacimiento y Destete ──
               Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _fechaNacController,
                       readOnly: true,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Fecha Nacimiento',
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.calendar_today),
                       ),
                       onTap: () => _selectDate(context, _fechaNacController),
                     ),
@@ -1467,50 +1616,96 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
                     child: TextField(
                       controller: _fechaDestController,
                       readOnly: true,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Fecha Destete',
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.calendar_today),
                       ),
                       onTap: () => _selectDate(context, _fechaDestController),
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
 
-              // ── Peso Nacimiento / Peso Destete ──
+              // ── Pesos: Nacimiento y Destete ──
               Row(
                 children: [
                   Expanded(
-                    child: _buildLabeledTextField(
-                      'Peso Nacimiento',
+                    child: TextField(
                       controller: _pesoNacController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Peso al nacer (kg)',
+                        prefixIcon: const Icon(
+                          Icons.monitor_weight,
+                          color: Colors.orange,
+                        ),
+                        filled: true,
+                        fillColor: Colors.orange[50],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onChanged: (_) => _markChanged(),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
-                    child: _buildLabeledTextField(
-                      'Peso Destete',
+                    child: TextField(
                       controller: _pesoDestController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Peso al destete (kg)',
+                        prefixIcon: const Icon(
+                          Icons.scale,
+                          color: Colors.deepPurple,
+                        ),
+                        filled: true,
+                        fillColor: Colors.purple[50],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onChanged: (_) => _markChanged(),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-
-              // ── Peso Ajustado / Edad (días) ──
               Row(
                 children: [
                   Expanded(
-                    child: _buildLabeledTextField(
-                      'Peso Ajustado',
+                    child: TextField(
                       controller: _pesoAjusController,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Peso Ajustado (kg)',
+                        prefixIcon: const Icon(Icons.fitness_center),
+                        filled: true,
+                        fillColor: Colors.green[50],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
-                    child: _buildLabeledTextField(
-                      'Edad (días)',
+                    child: TextField(
                       controller: _edadDiasController,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Edad (días)',
+                        prefixIcon: const Icon(Icons.calendar_today),
+                        filled: true,
+                        fillColor: Colors.blue[50],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1562,6 +1757,14 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
               const SizedBox(height: 8),
               _buildEpmurasInputs(),
 
+              const SizedBox(height: 20),
+
+              // ───── Campo: Comentario ─────
+              _buildLabeledTextField(
+                'Comentario del evaluador (PDF)',
+                controller: _comentarioController,
+                maxLines: 3,
+              ),
               const SizedBox(height: 20),
 
               // ───── Botones Guardar / Actualizar / Nuevo / Cancelar ─────
@@ -1647,62 +1850,93 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
   // ─────────────────────────────────────────────────────────────────
   // Construye inputs de EPMURAS
   Widget _buildEpmurasInputs() {
-    final letras = _epmuras.keys.toList();
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: letras.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 4,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 12,
+    final letrasIzquierda = ['E', 'P', 'M', 'U'];
+    final letrasDerecha = ['R', 'A', 'S'];
+
+    return Center(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Columna izquierda
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children:
+                letrasIzquierda
+                    .map(
+                      (letra) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6.0),
+                        child: _buildLetraInput(letra),
+                      ),
+                    )
+                    .toList(),
+          ),
+          const SizedBox(width: 40),
+          // Columna derecha
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children:
+                letrasDerecha
+                    .map(
+                      (letra) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6.0),
+                        child: _buildLetraInput(letra),
+                      ),
+                    )
+                    .toList(),
+          ),
+        ],
       ),
-      itemBuilder: (context, index) {
-        final letra = letras[index];
-        final maxItems = (letra == 'E' || letra == 'P' || letra == 'M') ? 6 : 4;
-        return Row(
-          children: [
-            Expanded(child: Text(letra, style: TextStyle(fontSize: 18))),
-            const SizedBox(width: 8),
-            // Contenedor con tamaño fijo
-            SizedBox(
-              width: 80,
-              height: 47,
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                style: TextStyle(fontSize: 18, color: Colors.black),
-                decoration: InputDecoration(
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                    vertical: 5,
-                    horizontal: 8,
-                  ),
-                  border: OutlineInputBorder(),
-                ),
-                iconSize: 30,
-                itemHeight: 48,
-                items: List.generate(
-                  maxItems,
-                  (i) => DropdownMenuItem(
-                    value: '${i + 1}',
-                    child: Center(
-                      child: Text('${i + 1}', style: TextStyle(fontSize: 17)),
-                    ),
-                  ),
-                ),
-                value: _epmuras[letra],
-                onChanged: (val) {
-                  setState(() {
-                    _epmuras[letra] = val;
-                    _markChanged();
-                  });
-                },
+    );
+  }
+
+  Widget _buildLetraInput(String letra) {
+    final maxItems = (letra == 'E' || letra == 'P' || letra == 'M') ? 6 : 4;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.blue.shade100,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            letra,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 80,
+          height: 44,
+          child: DropdownButtonFormField<String>(
+            value: _epmuras[letra],
+            isExpanded: true,
+            decoration: const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+              border: OutlineInputBorder(),
+            ),
+            style: const TextStyle(fontSize: 16, color: Colors.black),
+            iconSize: 24,
+            items: List.generate(
+              maxItems,
+              (i) => DropdownMenuItem(
+                value: '${i + 1}',
+                child: Center(child: Text('${i + 1}')),
               ),
             ),
-          ],
-        );
-      },
+            onChanged: (val) {
+              setState(() {
+                _epmuras[letra] = val!;
+                _markChanged();
+              });
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -1711,6 +1945,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
     String label, {
     required TextEditingController controller,
     List<TextInputFormatter>? inputFormatters,
+    int maxLines = 1,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1720,6 +1955,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
           Text(label),
           TextField(
             controller: controller,
+            maxLines: maxLines,
             keyboardType:
                 inputFormatters != null
                     ? TextInputType.number

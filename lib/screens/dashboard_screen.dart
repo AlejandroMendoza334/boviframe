@@ -1,5 +1,3 @@
-// lib/screens/dashboard_screen.dart
-
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -7,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:boviframe/widgets/custom_bottom_nav_bar.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -45,10 +44,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final evals =
           await ses.reference
               .collection('evaluaciones_animales')
-              .where(
-                'usuarioId',
-                isEqualTo: uid,
-              ) 
+              .where('usuarioId', isEqualTo: uid)
               .get();
 
       for (final e in evals.docs) {
@@ -80,6 +76,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ...animal,
               'indice': e + p + m,
               'numero': animal['numero'] ?? '-',
+              'nombre': animal['nombre'] ?? '', // <-- AÑADIDO
               'image_base64': animal['image_base64'],
             };
           }).toList()
@@ -101,9 +98,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       body: SafeArea(
-        // Cambiamos Column por ListView para permitir scroll
         child: ListView(
           padding: const EdgeInsets.only(bottom: 16),
           children: [
@@ -149,7 +144,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            ...topAnimales.map(_buildAnimalCard),
+            ...topAnimales.asMap().entries.map((entry) {
+              final index = entry.key;
+              final animal = entry.value;
+              return _buildAnimalCard(animal, isTop: true, index: index);
+            }),
             const SizedBox(height: 20),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
@@ -159,10 +158,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            ...bottomAnimales.map(_buildAnimalCard),
+            ...bottomAnimales.asMap().entries.map((entry) {
+              final index = entry.key;
+              final animal = entry.value;
+              return _buildAnimalCard(animal, isTop: false, index: index);
+            }),
           ],
         ),
       ),
+      bottomNavigationBar: const CustomBottomNavBar(
+        currentIndex: 4,
+      ), // usa el index correspondiente
     );
   }
 
@@ -215,11 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                  ),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
                 const Spacer(),
                 Row(
@@ -251,26 +253,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildAnimalCard(Map<String, dynamic> a) {
+  Widget _buildAnimalCard(
+    Map<String, dynamic> a, {
+    required bool isTop,
+    required int index,
+  }) {
     Uint8List? foto;
     final base = a['image_base64'] as String?;
     if (base != null && base.isNotEmpty) {
       foto = base64Decode(base);
     }
+
+    final indice = (a['indice'] as double).toStringAsFixed(1);
+    final color = isTop ? Colors.green[600] : Colors.red[600];
+
+    final medalIconsTop = ['🥇', '🥈', '🥉'];
+    final iconsBottom = ['❌', '⚠️', '💀'];
+    final leadingEmoji =
+        isTop
+            ? (index < medalIconsTop.length ? medalIconsTop[index] : '⭐️')
+            : (index < iconsBottom.length ? iconsBottom[index] : '❗️');
+
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      elevation: 3,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ListTile(
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: Colors.grey[200],
-          backgroundImage: foto != null ? MemoryImage(foto) : null,
+        leading: SizedBox(
+          width: 56,
+          height: 56,
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              if (foto != null)
+                CircleAvatar(backgroundImage: MemoryImage(foto), radius: 28)
+              else
+                Positioned(
+                  bottom: -2,
+                  right: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                    child: Text(
+                      leadingEmoji,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
+
         title: Text(
-          a['numero']?.toString() ?? '-',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          a['nombre']?.toString()?.isNotEmpty == true
+              ? a['nombre']
+              : 'Animal #${a['numero'] ?? '-'}',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text('Índice: ${(a['indice'] as double).toStringAsFixed(1)}'),
+
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4.0),
+          child: Row(
+            children: [
+              Icon(Icons.bar_chart, size: 16, color: color),
+              const SizedBox(width: 4),
+              Text(
+                'Índice: $indice',
+                style: TextStyle(color: color, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
         onTap:
             () => Navigator.pushNamed(context, '/animal_detail', arguments: a),
       ),
@@ -280,97 +337,99 @@ class _DashboardScreenState extends State<DashboardScreen> {
   BarChart _buildBarChart() {
     const letras = ['E', 'P', 'M', 'U', 'R', 'A', 'S'];
     final valores = letras.map((l) => promedios[l] ?? 0.0).toList();
-    final maxY = ((valores.isEmpty ? 0.0 : valores.reduce(max)) + 2).toDouble();
-    final interval = (maxY / 4).toDouble();
+    final maxY = ((valores.isEmpty ? 0.0 : valores.reduce(max)) + 1).clamp(
+      6.0,
+      10.0,
+    );
+    final interval = 1.0;
 
     return BarChart(
       BarChartData(
         maxY: maxY,
-        alignment: BarChartAlignment.spaceAround,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: interval,
-          getDrawingHorizontalLine:
-              (v) => FlLine(
-                color: Colors.grey.shade600,
-                strokeWidth: 1.5,
-                dashArray: [4, 4],
-              ),
+        minY: 0,
+        alignment: BarChartAlignment.spaceEvenly,
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+            tooltipBgColor: Colors.blueAccent,
+            tooltipPadding: const EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: 3,
+            ),
+            tooltipMargin: 5,
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              return BarTooltipItem(
+                '${rod.toY.toStringAsFixed(1)} pts',
+                const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              );
+            },
+          ),
         ),
         titlesData: FlTitlesData(
+          show: true,
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: interval,
+              reservedSize: 28,
+              getTitlesWidget:
+                  (value, meta) => Padding(
+                    padding: const EdgeInsets.only(right: 4.0),
+                    child: Text(
+                      value.toStringAsFixed(0),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+            ),
+          ),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 32,
               getTitlesWidget: (value, meta) {
                 final idx = value.toInt();
                 if (idx < 0 || idx >= letras.length) return const SizedBox();
-                return SideTitleWidget(
-                  meta: meta,
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     letras[idx],
                     style: const TextStyle(
-                      color: Color(0xFF3AC8F0),
-                      fontWeight: FontWeight.bold,
                       fontSize: 14,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 );
               },
             ),
           ),
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              interval: interval,
-              reservedSize: 40,
-              getTitlesWidget: (value, meta) {
-                final txt =
-                    value == maxY
-                        ? value.toStringAsFixed(1)
-                        : value.toStringAsFixed(0);
-                return Text(
-                  txt,
-                  style: TextStyle(
-                    color: Colors.grey.shade800,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                );
-              },
-            ),
-          ),
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: interval,
+          getDrawingHorizontalLine:
+              (value) => FlLine(
+                strokeWidth: 1,
+                dashArray: [4, 4],
+              ),
         ),
         borderData: FlBorderData(show: false),
-        barTouchData: BarTouchData(
-          enabled: true,
-          touchTooltipData: BarTouchTooltipData(
-            tooltipPadding: EdgeInsets.zero,
-            tooltipMargin: 0,
-            getTooltipItem:
-                (_, __, rod, ___) => BarTooltipItem(
-                  rod.toY.toStringAsFixed(1),
-                  const TextStyle(
-                    color: Color(0xFF3AC8F0),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-          ),
-        ),
-
         barGroups: List.generate(valores.length, (i) {
           return BarChartGroupData(
             x: i,
-            showingTooltipIndicators: [0],
             barRods: [
               BarChartRodData(
                 toY: valores[i],
-                width: 12,
-                borderRadius: BorderRadius.circular(4),
+                width: 14,
+                borderRadius: BorderRadius.circular(6),
                 gradient: const LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
@@ -378,6 +437,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ],
+            showingTooltipIndicators: [0],
           );
         }),
       ),
