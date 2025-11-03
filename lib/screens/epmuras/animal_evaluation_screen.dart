@@ -1,16 +1,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/services.dart'; // Para rootBundle.load()
-import 'dart:ui' as ui;
-import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:flutter/rendering.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -18,10 +15,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw; // pw.Document, pw.Table, pw.Text, etc.
 import 'package:printing/printing.dart';
-import '../../services/pdf_service.dart';
 
 import '../providers/session_provider.dart';
-import '../providers/settings_provider.dart';
 import '../../widgets/custom_app_scaffold.dart';
 import '../../services/offline_session_service.dart';
 import '../../services/connectivity_service.dart';
@@ -94,15 +89,6 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
     }
   }
 
-  Future<Uint8List> _resizeImage(Uint8List data, int maxWidth) async {
-    final codec = await ui.instantiateImageCodec(data, targetWidth: maxWidth);
-    final frame = await codec.getNextFrame();
-    final byteData = await frame.image.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
-    return byteData!.buffer.asUint8List();
-  }
-
   // ──────────────────────────────
 
   // Dropdowns:
@@ -123,12 +109,10 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
   Uint8List? _imageBytes; // Foto del animal
   String? _sessionId; // Viene de SessionProvider
   bool _hasChanged = false;
-  String? _lastEvaluationId;
   bool _loading = true;
 
   Map<String, dynamic>? _sessionData;
   Map<String, dynamic>? _producerData;
-  Map<String, dynamic>? _userData;
 
   @override
   void initState() {
@@ -405,15 +389,16 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
         _producerData = null;
       }
 
-      // 3) Cargar datos del usuario: **usar “userId” en lugar de “usuarioId”**
+      // 3) Cargar datos del usuario: **usar "userId" en lugar de "usuarioId"**
       final userId = _sessionData?['userId'] as String?;
       if (userId != null) {
-        final userSnap =
-            await FirebaseFirestore.instance
-                .collection('usuarios')
-                .doc(userId)
-                .get();
-        _userData = userSnap.data();
+        // Los datos del usuario se cargarán cuando se necesiten en el PDF
+        // final userSnap =
+        //     await FirebaseFirestore.instance
+        //         .collection('usuarios')
+        //         .doc(userId)
+        //         .get();
+        // _userData = userSnap.data();
       }
     } catch (e) {
       debugPrint('Error cargando datos de sesión/productor/usuario: $e');
@@ -540,7 +525,6 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
               .collection('evaluaciones_animales')
               .add(data);
 
-          _lastEvaluationId = docRef.id;
           _hasChanged = false;
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -557,7 +541,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
           try {
             final offlineId = await OfflineSessionService.saveEvaluationOffline(
               evaluationData: data,
-              sessionId: _sessionId,
+              sessionId: _sessionId ?? '',
             );
             
             if (mounted) {
@@ -588,7 +572,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
       try {
         await OfflineSessionService.saveEvaluationOffline(
           evaluationData: data,
-          sessionId: _sessionId,
+          sessionId: _sessionId ?? '',
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1124,9 +1108,9 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
     );
   }
 
-  /// Calcula el promedio de EPMURAS para una lista de snapshots
+  /// Calcula el promedio de EPMURAS para una lista de evaluaciones
   Map<String, double> _calcularPromedioSesion(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    List<Map<String, dynamic>> evaluaciones,
   ) {
     Map<String, double> sumMap = {
       'E': 0,
@@ -1139,9 +1123,8 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
     };
     int count = 0;
 
-    for (var doc in docs) {
-      final data = doc.data();
-      final epm = (data['epmuras'] as Map<String, dynamic>? ?? {});
+    for (var evalData in evaluaciones) {
+      final epm = (evalData['epmuras'] as Map<String, dynamic>? ?? {});
       if (epm.isNotEmpty) {
         count++;
         sumMap.forEach((key, _) {
@@ -1158,6 +1141,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
 
   /// -----------------------------------------------------------------------
   /// Genera (o comparte) el PDF con todos los datos (animal, usuario, lista EPMURAS, etc.)
+  // ignore: unused_element
   Future<void> _printOrSharePDF(Map<String, dynamic> m) async {
     try {
       // ─── 1) EXTRAER DATOS DE 'm' ─────────────────────────────────────────
@@ -1280,12 +1264,7 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
                 (e) => (e['sessionId']?.toString() ?? '') == currentSessionId,
               )
               .toList();
-      final evalDocsSession =
-          evalsActualSession.map((e) {
-            return FakeQueryDocumentSnapshot(e)
-                as QueryDocumentSnapshot<Map<String, dynamic>>;
-          }).toList();
-      final promedioSesionMap = _calcularPromedioSesion(evalDocsSession);
+      final promedioSesionMap = _calcularPromedioSesion(evalsActualSession);
 
       // ─── 7) CREAR EL DOCUMENTO PDF ────────────────────────────────────────
       final pdf = pw.Document();
@@ -2006,31 +1985,3 @@ class _AnimalEvaluationScreenState extends State<AnimalEvaluationScreen> {
   }
 }
 
-/// Clase auxiliar para adaptar un Map<String,dynamic> a
-/// QueryDocumentSnapshot<Map<String,dynamic>>
-class FakeQueryDocumentSnapshot
-    implements QueryDocumentSnapshot<Map<String, dynamic>> {
-  final Map<String, dynamic> _data;
-
-  FakeQueryDocumentSnapshot(this._data);
-
-  @override
-  Map<String, dynamic> data() => _data;
-
-  @override
-  late final DocumentReference<Map<String, dynamic>> reference =
-      FirebaseFirestore.instance
-          .collection('sesiones')
-          .doc('fake')
-          .collection('evaluaciones_animales')
-          .doc();
-
-  @override
-  SnapshotMetadata get metadata => throw UnimplementedError();
-
-  @override
-  String get id => reference.id;
-
-  @override
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
